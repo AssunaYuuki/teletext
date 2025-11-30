@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= folderName %> — Страницы</title>
+  <link rel="stylesheet" href="/global.css">
+  <style>
+    .folder-container {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 20px 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-mono);
+    }
+
+    .content-wrapper {
+      width: 100%;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--accent);
+      padding-bottom: 10px;
+    }
+
+    .header h1 {
+      color: var(--accent);
+      margin: 0;
+      font-size: 2rem;
+      text-shadow: 0 0 8px rgba(0, 204, 102, 0.6);
+    }
+
+    .breadcrumb {
+      font-size: 0.9rem;
+      opacity: 0.7;
+      margin-top: 5px;
+    }
+
+    .breadcrumb a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+
+
+  </style>
+</head>
+<body>
+
+  <!-- Навигация -->
+  <header class="nav-bar">
+    <div class="breadcrumb">
+      <a href="/">🏠 Главная</a>
+      <% if (breadcrumb && breadcrumb.length > 0) { %>
+        <% breadcrumb.forEach((crumb, i) => { %>
+          <% if (i === breadcrumb.length - 1) { %>
+            <span> → <%= crumb.name %></span>
+          <% } else { %>
+            <a href="/folder/<%= encodeURIComponent(crumb.path) %>"> → <%= crumb.name %></a>
+          <% } %>
+        <% }) %>
+      <% } %>
+    </div>
+
+    <h2>
+      <% if (hasLogo) { %>
+        <img src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип" style="height:32px;vertical-align:middle;margin-right:8px;">
+      <% } %>
+      <%= folderName %>
+    </h2>
+  </header>
+
+  <!-- Центральный контент -->
+  <div class="folder-container">
+    <div class="content-wrapper">
+      <!-- Заголовок -->
+      <div class="header">
+        <h1><%= folderName %></h1>
+        <div class="breadcrumb">
+          Подпапок: <%= folders.length %>, страниц: <%= pages.length %>
+        </div>
+      </div>
+
+      <!-- Список подпапок -->
+      <% if (folders.length > 0) { %>
+        <section>
+          <h3>📁 Подпапки</h3>
+          <div class="grid">
+            <% folders.forEach(folder => { %>
+              <a href="/folder/<%= encodeURIComponent(currentPath ? currentPath + '/' + folder : folder) %>" class="card">
+                <% if (folderLogos && folderLogos[folder]) { %>
+                  <img src="<%= folderLogos[folder] %>?t=<%= Date.now() %>" alt="Логотип" style="height:32px; max-width: 100%; object-fit: contain;">
+                <% } else { %>
+                  <span style="color:#ffcc00;font-size:0.9rem;">🌐</span>
+                <% } %>
+                <span style="font-size:0.85rem; text-align:center; display:block; word-wrap:break-word; line-height:1.2;"><%= folder %></span>
+              </a>
+            <% }) %>
+          </div>
+        </section>
+      <% } %>
+
+          <!-- Сетка миниатюр страниц -->
+          <% if (pages.length > 0) { %>
+            <section class="thumbs-grid">
+              <h3>🖼️ Страницы</h3>
+              <div class="grid">
+                <% pages.forEach(item => { %>
+                  <a
+                    href="/page/<%= encodeURIComponent(currentPath) %>/<%= item.page %>"
+                    class="thumb-item">
+                    <% if (item.hasThumb) { %>
+                      <img src="<%= `/teletext/${currentPath}/${item.page}.png` %>" alt="Стр. <%= item.page %>">
+                    <% } else { %>
+                      <div style="height:100px; background:#f8fff8; display:flex; align-items:center; justify-content:center; color:var(--accent); font-size:0.9rem;">
+                        <%= item.page %>
+                      </div>
+                    <% } %>
+                    <span><%= item.page %></span>
+                  </a>
+                <% }) %>
+              </div>
+            </section>
+          <% } else if(folders.length === 0) { %>
+            <div class="empty">
+              <p>Нет ни подпапок, ни страниц.</p>
+            </div>
+          <% } %>
+
+  <footer>
+    <small>Телетекст | Путь: <%= currentPath || 'корень' %></small>
+  </footer>
+
+  <script>
+    // Звук щелчка при наведении
+    document.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('mouseenter', () => {
+        const audio = document.getElementById('clickSound');
+        if (audio) {
+          audio.currentTime = 0;
+          audio.play().catch(e => console.log('Audio play error:', e));
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "teletext-player",
+  "version": "1.0.0",
+  "description": "Плеер телетекста с красивым дизайном и автогенерацией PNG",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "multer": "^2.0.2",
+    "puppeteer": "^22.15.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.2",
+    "nodemon": "^3.1.4",
+    "vite": "^7.2.4",
+    "vue": "^3.5.24"
+  }
+}

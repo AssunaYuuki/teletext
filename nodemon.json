@@ -1,0 +1,14 @@
+{
+  "ignore": [
+    ".git",
+    "node_modules/",
+    "teletext/**/*.png"
+  ],
+  "watch": [
+    "*.*"
+  ],
+  "execMap": {
+    "js": "node"
+  },
+  "delay": "1000"
+}
