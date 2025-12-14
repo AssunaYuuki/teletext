@@ -5,15 +5,11 @@ const multer = require('multer');
 const os = require('os');
 const puppeteer = require('puppeteer');
 
-// 📝 Логгирование
-const logDir = path.join(__dirname, 'logs');
-if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
-const logFile = path.join(logDir, 'app.log');
+
 
 function logAction(action, details = '') {
     const timestamp = new Date().toISOString();
     const line = `[${timestamp}] ${action}${details ? ` - ${details}` : ''}\n`;
-    fs.appendFileSync(logFile, line, 'utf8');
     console.log(line.trim());
 }
 
