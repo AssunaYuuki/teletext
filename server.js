@@ -48,6 +48,7 @@ function isValidPath(p) {
     return !p.includes('..') && !p.startsWith('/') && !p.includes(':') && !p.includes('\\') && !p.includes('\0');
 }
 
+
 // 🖼️ Генерация PNG
 async function generateThumbnail(htmlPath, pngPath) {
     const browser = await puppeteer.launch({
