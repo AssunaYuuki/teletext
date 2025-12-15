@@ -145,6 +145,7 @@
       font-size: 0.95rem;
     }
 
+    .form-group textarea,
     .form-group input[type="text"],
     .form-group input[type="file"] {
       width: 100%;
@@ -158,6 +159,7 @@
       transition: border-color 0.2s ease;
     }
 
+    .form-group textarea:focus,
     .form-group input[type="text"]:focus,
     .form-group input[type="file"]:focus {
       outline: none;
@@ -167,6 +169,11 @@
 
     .form-group input[type="file"] {
       padding: 8px;
+    }
+
+    .form-group textarea {
+      min-height: 60px;
+      resize: vertical;
     }
 
     small {
@@ -302,7 +309,7 @@
       <div class="card-title" id="preview-title"><%= currentTitle %></div>
     </div>
 
-    <!-- Форма: логотип + название -->
+    <!-- Форма: логотип + название + описание -->
     <form id="edit-form" method="POST" action="/save-card/<%= archivePath %>" enctype="multipart/form-data">
       <div class="form-section">
         <h2>🖼️ Логотип</h2>
@@ -331,9 +338,18 @@
         </div>
       </div>
 
+      <div class="form-section">
+        <h2>📝 Описание канала</h2>
+        <div class="form-group">
+          <label for="description">Текст, который появляется при наведении</label>
+          <textarea id="description" name="description" placeholder="Введите описание канала"><%= currentDescription %></textarea>
+          <small>Сохраняется в <code>description.txt</code></small>
+        </div>
+      </div>
+
       <div class="btn-group">
         <button type="submit" class="btn">💾 Сохранить изменения</button>
-        <a href="#" class="btn" onclick="history.back(); return false;">← Назад</a>
+        <a href="#" class="btn" onclick="history.back(); return false;">← Отмена</a>
       </div>
     </form>
 

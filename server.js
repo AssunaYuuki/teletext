@@ -46,8 +46,9 @@ function decodeURIComponentSafely(str) {
 
 function isValidPath(p) {
     if (!p) return true;
-    // Разрешаем: буквы (латиница и кириллица), цифры, пробел, запятую, точку, дефис, подчёркивание, слэш
-    const allowedChars = /^[a-zA-Z\u0400-\u04FF0-9\s\,\.\-_\/]+$/;
+    // Разрешаем: буквы (лат. и кириллица), цифры, пробел, запятую, точку, дефис, подчёркивание, слэш
+    // ВАЖНО: только дефис нужно экранировать как \-
+    const allowedChars = /^[a-zA-Zа-яА-ЯёЁ0-9\s\\,\\.\-_/]+$/u;
     if (!allowedChars.test(p)) {
         return false;
     }
@@ -153,7 +154,7 @@ app.get('/folder/*', async (req, res) => {
     const logoExistsPng = fs.existsSync(path.join(fullPath, 'logo.png'));
     const logoUrl = logoExists ? `/teletext/${decodedPath}/logo.svg` : logoExistsPng ? `/teletext/${decodedPath}/logo.png` : null;
 
-    // ✅ Чтение названий для подпапок
+    // ✅ Чтение названий и описаний для подпапок
     const folderCards = {};
     folders.forEach(folder => {
         const folderPath = path.join(fullPath, folder);
@@ -170,13 +171,25 @@ app.get('/folder/*', async (req, res) => {
             }
         }
 
+        // ✅ Читаем description.txt
+        let description = '';
+        const descFile = path.join(folderPath, 'description.txt');
+        if (fs.existsSync(descFile)) {
+            try {
+                description = fs.readFileSync(descFile, 'utf-8').trim();
+            } catch (e) {
+                logAction('DESC_READ_WARN', `Не удалось прочитать description.txt в ${folder}`);
+            }
+        }
+
         folderCards[folder] = {
             logoUrl: hasSvg
                 ? `/teletext/${decodedPath ? decodedPath + '/' : ''}${folder}/logo.svg`
                 : hasPng
                     ? `/teletext/${decodedPath ? decodedPath + '/' : ''}${folder}/logo.png`
                     : null,
-            displayName
+            displayName,
+            description // ✅ Передаём описание
         };
     });
 
@@ -271,6 +284,17 @@ app.get('/edit-card/*', (req, res) => {
         }
     }
 
+    // ✅ Читаем description.txt
+    let description = '';
+    const descFile = path.join(fullPath, 'description.txt');
+    if (fs.existsSync(descFile)) {
+        try {
+            description = fs.readFileSync(descFile, 'utf-8').trim();
+        } catch (err) {
+            logAction('DESC_READ_ERROR', `${descFile}: ${err.message}`);
+        }
+    }
+
     const logoExists = fs.existsSync(path.join(fullPath, 'logo.svg'));
     const logoExistsPng = fs.existsSync(path.join(fullPath, 'logo.png'));
     const logoUrl = logoExists ? `/teletext/${decodedPath}/logo.svg` : logoExistsPng ? `/teletext/${decodedPath}/logo.png` : null;
@@ -279,12 +303,13 @@ app.get('/edit-card/*', (req, res) => {
         archivePath: decodedPath, // Передаём decodedPath, а не raw
         folderName: path.basename(fullPath),
         currentTitle: title,
+        currentDescription: description, // ✅ Передаём описание
         hasLogo: logoExists || logoExistsPng,
         logoUrl
     });
 });
 
-// 💾 Сохранение логотипа + названия
+// 💾 Сохранение логотипа + названия + описания
 app.post('/save-card/*', upload.single('logo'), (req, res) => {
     const requestedPath = req.params[0] || '';
     let decodedPath = requestedPath;
@@ -305,6 +330,7 @@ app.post('/save-card/*', upload.single('logo'), (req, res) => {
     }
 
     const newTitle = (req.body.title || '').trim();
+    const newDescription = (req.body.description || '').trim(); // ✅ Новое поле
     if (!newTitle) {
         logAction('CARD_SAVE_FAIL', 'Пустое название');
         return res.redirect(`/edit-card/${decodedPath}`); // ← decodedPath
@@ -319,7 +345,29 @@ app.post('/save-card/*', upload.single('logo'), (req, res) => {
         logAction('TITLE_SAVE_ERROR', `${decodedPath}: ${err.message}`);
     }
 
-    // 2️⃣ Сохраняем логотип (если загружен)
+    // 2️⃣ Сохраняем описание
+    if (newDescription) {
+        const descFile = path.join(fullPath, 'description.txt');
+        try {
+            fs.writeFileSync(descFile, newDescription, 'utf-8');
+            logAction('DESC_SAVED', `${newDescription.substring(0, 20)}... → ${decodedPath}`);
+        } catch (err) {
+            logAction('DESC_SAVE_ERROR', `${decodedPath}: ${err.message}`);
+        }
+    } else {
+        // Если описание пустое — удаляем файл, если он был
+        const descFile = path.join(fullPath, 'description.txt');
+        if (fs.existsSync(descFile)) {
+            try {
+                fs.unlinkSync(descFile);
+                logAction('DESC_DELETED', `description.txt удален из ${decodedPath}`);
+            } catch (err) {
+                logAction('DESC_DELETE_ERROR', `${decodedPath}: ${err.message}`);
+            }
+        }
+    }
+
+    // 3️⃣ Сохраняем логотип (если загружен)
     if (req.file) {
         const targetName = req.file.originalname.toLowerCase().endsWith('.svg') ? 'logo.svg' : 'logo.png';
         const targetPath = path.join(fullPath, targetName);

@@ -82,7 +82,6 @@
       border-color: #00ffaa;
     }
 
-
     .edit-btn-wrapper {
       position: absolute;
       top: 4px;
@@ -140,6 +139,30 @@
       object-fit: cover;
       border-radius: 3px;
     }
+
+    /* Подсказка */
+    .tooltip {
+      position: absolute;
+      top: 0;
+      left: 100%;
+      margin-left: 10px;
+      padding: 10px;
+      background: rgba(14, 20, 16, 0.9);
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      color: var(--fg);
+      font-size: 0.9rem;
+      white-space: pre-line;
+      z-index: 100;
+      display: none;
+      box-shadow: 0 0 10px rgba(0, 255, 153, 0.3);
+      max-width: 250px;
+      line-height: 1.4;
+    }
+
+    .card:hover .tooltip {
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -183,6 +206,7 @@
                 const card = folderCards[folder] || {};
                 const logoUrl = card.logoUrl;
                 const displayName = card.displayName || folder;
+                const description = card.description || ''; // ✅ Получаем описание
             %>
               <div class="card-container" style="position:relative; display:inline-block;">
                 <a href="/folder/<%= currentPath ? currentPath + '/' + folder : folder %>"
@@ -203,6 +227,11 @@
 
                   <!-- Название -->
                   <span style="font-size:0.85rem; text-align:center; display:block; word-wrap:break-word; line-height:1.2; margin-top:6px;"><%= displayName %></span>
+
+                  <!-- Подсказка -->
+                  <% if (description) { %>
+                    <div class="tooltip"><%= description %></div>
+                  <% } %>
 
                 </a>
               </div>
