@@ -97,74 +97,12 @@ if (window.console && window.console.log) {
     window.console.log = function() {};
 }
 
-// Блокируем alert, confirm, prompt
-window.alert = function() {};
-window.confirm = function() { return true; };
-window.prompt = function() { return ''; };
-
-// Блокируем eval
-window.eval = function() {
-    throw new Error('Eval запрещён');
-};
-
-// Блокируем Function
-window.Function = function() {
-    throw new Error('Function запрещён');
-};
-
-// Блокируем setTimeout, setInterval
-window.setTimeout = function() {
-    throw new Error('setTimeout запрещён');
-};
-window.setInterval = function() {
-    throw new Error('setInterval запрещён');
-};
-
-// Блокируем localStorage, sessionStorage
-window.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-    removeItem: () => {},
-    clear: () => {}
-};
-
-window.sessionStorage = {
-    getItem: () => null,
-    setItem: () => {},
-    removeItem: () => {},
-    clear: () => {}
-};
-
-// Блокируем navigator
-Object.defineProperty(navigator, 'userAgent', {
-    get: () => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-});
-
-// Блокируем document.write
-document.write = function() {
-    throw new Error('document.write запрещён');
-};
-
-// Блокируем document.createDocumentFragment
-document.createDocumentFragment = function() {
-    throw new Error('createDocumentFragment запрещён');
-};
 
 
-// Блокируем document.createTextNode
-document.createTextNode = function() {
-    throw new Error('createTextNode запрещён');
-};
 
-// Блокируем document.createComment
-document.createComment = function() {
-    throw new Error('createComment запрещён');
-};
 
-// Блокируем document.createProcessingInstruction
-document.createProcessingInstruction = function() {
-    throw new Error('createProcessingInstruction запрещён');
-};
+
+
 
 // Блокируем document.createAttribute
 document.createAttribute = function() {
