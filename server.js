@@ -106,12 +106,12 @@ app.get('/', (req, res) => {
     const folders = fs.existsSync(dir)
         ? fs.readdirSync(dir).filter(f => fs.statSync(path.join(dir, f)).isDirectory())
         : [];
-    res.render('index', { folders });
+    res.render('index', { folders, disableCopy: true });
 });
 
 // ℹ️ О проекте
 app.get('/about', (req, res) => {
-    res.render('about');
+    res.render('about', { disableCopy: true });
 });
 
 // 📁 Папка
@@ -193,7 +193,8 @@ app.get('/folder/*', async (req, res) => {
         breadcrumb,
         hasLogo: logoExists || logoExistsPng,
         logoUrl,
-        folderCards
+        folderCards,
+        disableCopy: true
     });
 });
 
@@ -241,7 +242,8 @@ app.get('/page/*/:page', async (req, res) => {
         breadcrumb,
         basePath,
         hasLogo: logoExists || logoExistsPng,
-        logoUrl
+        logoUrl,
+        disableCopy: true
     });
 });
 
@@ -288,7 +290,8 @@ app.get('/edit-card/*', (req, res) => {
         currentTitle: title,
         currentDescription: description, // ✅ Передаём описание
         hasLogo: logoExists || logoExistsPng,
-        logoUrl
+        logoUrl,
+        disableCopy: true
     });
 });
 

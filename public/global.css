@@ -308,3 +308,32 @@ footer {
     .nav-bar { flex-direction: column; }
     footer { flex-direction: column; }
 }
+
+/* 🔒 ЗАЩИТА ОТ КОПИРОВАНИЯ */
+
+/* Запрет выделения текста */
+* {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Запрет правой кнопки мыши */
+body {
+    oncontextmenu="return false;"
+}
+
+/* Запрет Ctrl+C / Ctrl+V */
+input, textarea {
+    oncopy="return false;" oncut="return false;" onpaste="return false;"
+}
+
+/* Запрет перетаскивания */
+img, a {
+    -webkit-user-drag: none;
+    -khtml-user-drag: none;
+    -moz-user-drag: none;
+    -o-user-drag: none;
+    user-drag: none;
+}
