@@ -91,3 +91,321 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+// Блокируем console.log
+if (window.console && window.console.log) {
+    window.console.log = function() {};
+}
+
+// Блокируем alert, confirm, prompt
+window.alert = function() {};
+window.confirm = function() { return true; };
+window.prompt = function() { return ''; };
+
+// Блокируем eval
+window.eval = function() {
+    throw new Error('Eval запрещён');
+};
+
+// Блокируем Function
+window.Function = function() {
+    throw new Error('Function запрещён');
+};
+
+// Блокируем setTimeout, setInterval
+window.setTimeout = function() {
+    throw new Error('setTimeout запрещён');
+};
+window.setInterval = function() {
+    throw new Error('setInterval запрещён');
+};
+
+// Блокируем localStorage, sessionStorage
+window.localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {}
+};
+
+window.sessionStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {}
+};
+
+// Блокируем navigator
+Object.defineProperty(navigator, 'userAgent', {
+    get: () => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+});
+
+// Блокируем window.location
+Object.defineProperty(window, 'location', {
+    get: () => ({
+        href: 'https://localhost:3000',
+        protocol: 'http:',
+        host: 'localhost:3000',
+        hostname: 'localhost',
+        port: '3000',
+        pathname: '/',
+        search: '',
+        hash: ''
+    }),
+    set: () => {}
+});
+
+// Блокируем document.write
+document.write = function() {
+    throw new Error('document.write запрещён');
+};
+
+// Блокируем document.body
+Object.defineProperty(document, 'body', {
+    get: () => ({
+        innerHTML: '<h1></h1><p></p>',
+        style: {}
+    }),
+    set: () => {}
+});
+
+// Блокируем document.documentElement
+Object.defineProperty(document, 'documentElement', {
+    get: () => ({
+        innerHTML: '<h1></h1><p></p>',
+        style: {}
+    }),
+    set: () => {}
+});
+
+// Блокируем document.head
+Object.defineProperty(document, 'head', {
+    get: () => ({
+        innerHTML: '<title>Телетекст</title>',
+        style: {}
+    }),
+    set: () => {}
+});
+
+// Блокируем document.title
+Object.defineProperty(document, 'title', {
+    get: () => 'Телетекст',
+    set: () => {}
+});
+
+// Блокируем document.cookie
+Object.defineProperty(document, 'cookie', {
+    get: () => '',
+    set: () => {}
+});
+
+// Блокируем document.domain
+Object.defineProperty(document, 'domain', {
+    get: () => 'localhost',
+    set: () => {}
+});
+
+// Блокируем document.referrer
+Object.defineProperty(document, 'referrer', {
+    get: () => '',
+    set: () => {}
+});
+
+// Блокируем document.URL
+Object.defineProperty(document, 'URL', {
+    get: () => 'https://localhost:3000',
+    set: () => {}
+});
+
+// Блокируем document.documentURI
+Object.defineProperty(document, 'documentURI', {
+    get: () => 'https://localhost:3000',
+    set: () => {}
+});
+
+// Блокируем document.lastModified
+Object.defineProperty(document, 'lastModified', {
+    get: () => '01/01/1970 00:00:00',
+    set: () => {}
+});
+
+// Блокируем document.readyState
+Object.defineProperty(document, 'readyState', {
+    get: () => 'complete',
+    set: () => {}
+});
+
+// Блокируем document.characterSet
+Object.defineProperty(document, 'characterSet', {
+    get: () => 'UTF-8',
+    set: () => {}
+});
+
+// Блокируем document.contentType
+Object.defineProperty(document, 'contentType', {
+    get: () => 'text/html',
+    set: () => {}
+});
+
+// Блокируем document.doctype
+Object.defineProperty(document, 'doctype', {
+    get: () => ({
+        name: 'html',
+        publicId: '',
+        systemId: ''
+    }),
+    set: () => {}
+});
+
+// Блокируем document.implementation
+Object.defineProperty(document, 'implementation', {
+    get: () => ({
+        createDocumentType: () => ({})
+    }),
+    set: () => {}
+});
+
+// Блокируем document.createDocumentFragment
+document.createDocumentFragment = function() {
+    throw new Error('createDocumentFragment запрещён');
+};
+
+// Блокируем document.createElement
+document.createElement = function() {
+    throw new Error('createElement запрещён');
+};
+
+// Блокируем document.createTextNode
+document.createTextNode = function() {
+    throw new Error('createTextNode запрещён');
+};
+
+// Блокируем document.createComment
+document.createComment = function() {
+    throw new Error('createComment запрещён');
+};
+
+// Блокируем document.createProcessingInstruction
+document.createProcessingInstruction = function() {
+    throw new Error('createProcessingInstruction запрещён');
+};
+
+// Блокируем document.createAttribute
+document.createAttribute = function() {
+    throw new Error('createAttribute запрещён');
+};
+
+// Блокируем document.createAttributeNS
+document.createAttributeNS = function() {
+    throw new Error('createAttributeNS запрещён');
+};
+
+// Блокируем document.createEvent
+document.createEvent = function() {
+    throw new Error('createEvent запрещён');
+};
+
+// Блокируем document.createRange
+document.createRange = function() {
+    throw new Error('createRange запрещён');
+};
+
+// Блокируем document.createNodeIterator
+document.createNodeIterator = function() {
+    throw new Error('createNodeIterator запрещён');
+};
+
+// Блокируем document.createTreeWalker
+document.createTreeWalker = function() {
+    throw new Error('createTreeWalker запрещён');
+};
+
+// Блокируем document.createExpression
+document.createExpression = function() {
+    throw new Error('createExpression запрещён');
+};
+
+// Блокируем document.createNSResolver
+document.createNSResolver = function() {
+    throw new Error('createNSResolver запрещён');
+};
+
+// Блокируем document.createCDATASection
+document.createCDATASection = function() {
+    throw new Error('createCDATASection запрещён');
+};
+
+// Блокируем document.createEntityReference
+document.createEntityReference = function() {
+    throw new Error('createEntityReference запрещён');
+};
+
+// Блокируем document.createDocumentType
+document.createDocumentType = function() {
+    throw new Error('createDocumentType запрещён');
+};
+
+// Блокируем document.createProcessingInstruction
+document.createProcessingInstruction = function() {
+    throw new Error('createProcessingInstruction запрещён');
+};
+
+// Блокируем document.createAttribute
+document.createAttribute = function() {
+    throw new Error('createAttribute запрещён');
+};
+
+// Блокируем document.createAttributeNS
+document.createAttributeNS = function() {
+    throw new Error('createAttributeNS запрещён');
+};
+
+// Блокируем document.createEvent
+document.createEvent = function() {
+    throw new Error('createEvent запрещён');
+};
+
+// Блокируем document.createRange
+document.createRange = function() {
+    throw new Error('createRange запрещён');
+};
+
+// Блокируем document.createNodeIterator
+document.createNodeIterator = function() {
+    throw new Error('createNodeIterator запрещён');
+};
+
+// Блокируем document.createTreeWalker
+document.createTreeWalker = function() {
+    throw new Error('createTreeWalker запрещён');
+};
+
+// Блокируем document.createExpression
+document.createExpression = function() {
+    throw new Error('createExpression запрещён');
+};
+
+// Блокируем document.createNSResolver
+document.createNSResolver = function() {
+    throw new Error('createNSResolver запрещён');
+};
+
+// Блокируем document.createCDATASection
+document.createCDATASection = function() {
+    throw new Error('createCDATASection запрещён');
+};
+
+// Блокируем document.createEntityReference
+document.createEntityReference = function() {
+    throw new Error('createEntityReference запрещён');
+};
+
+// Блокируем document.createDocumentType
+document.createDocumentType = function() {
+    throw new Error('createDocumentType запрещён');
+};
+
+// Блокируем document.createProcessingInstruction
+document.createDocumentType = function() {
+    throw new Error('createProcessingInstruction запрещён');
+};
