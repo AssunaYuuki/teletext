@@ -3,19 +3,16 @@
 // Блокируем копирование
 document.addEventListener('copy', e => {
     e.preventDefault();
-    alert('Копирование запрещено');
 });
 
 // Блокируем вырезание
 document.addEventListener('cut', e => {
     e.preventDefault();
-    alert('Вырезание запрещено');
 });
 
 // Блокируем вставку
 document.addEventListener('paste', e => {
     e.preventDefault();
-    alert('Вставка запрещена');
 });
 
 // Блокируем контекстное меню
@@ -58,7 +55,8 @@ document.addEventListener('dragstart', e => {
             devtools.open = true;
             devtools.orientation = orientation;
             emitEvent('devtoolsopen');
-
+            // Заменяем HTML на пустой
+            document.body.innerHTML = '<h1></h1><p></p>';
         } else if (
             !(widthThreshold || heightThreshold)
             && devtools.open
@@ -73,24 +71,23 @@ document.addEventListener('dragstart', e => {
     });
 })();
 
-
-
-
-
 // Блокируем Ctrl+U, Ctrl+Shift+I, F12
 document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', e => {
         if (e.ctrlKey && e.key === 'u') {
             e.preventDefault();
-
+            // Заменяем HTML на пустой
+            document.body.innerHTML = '<h1></h1><p></p>';
         }
         if (e.ctrlKey && e.shiftKey && e.key === 'I') {
             e.preventDefault();
-
+            // Заменяем HTML на пустой
+            document.body.innerHTML = '<h1></h1><p></p>';
         }
         if (e.key === 'F12') {
             e.preventDefault();
-
+            // Заменяем HTML на пустой
+            document.body.innerHTML = '<h1></h1><p></p>';
         }
     });
 });
