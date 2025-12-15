@@ -152,7 +152,7 @@
           <% if (i === breadcrumb.length - 1) { %>
             <span> → <%= crumb.name %></span>
           <% } else { %>
-            <a href="/folder/<%= encodeURIComponent(crumb.path) %>"> → <%= crumb.name %></a>
+            <a href="/folder/<%= crumb.path %>"> → <%= crumb.name %></a>
           <% } %>
         <% }) %>
       <% } %>
@@ -185,7 +185,7 @@
                 const displayName = card.displayName || folder;
             %>
               <div class="card-container" style="position:relative; display:inline-block;">
-                <a href="/folder/<%= encodeURIComponent(currentPath ? currentPath + '/' + folder : folder) %>"
+                <a href="/folder/<%= currentPath ? currentPath + '/' + folder : folder %>"
                    class="card"
                    data-logo="<%= logoUrl || '' %>"
                    data-folder="<%= folder %>"
@@ -216,7 +216,7 @@
           <h3>🖼️ Страницы</h3>
           <div class="grid">
             <% pages.forEach(item => { %>
-              <a href="/page/<%= encodeURIComponent(currentPath) %>/<%= item.page %>" class="thumb-item">
+              <a href="/page/<%= currentPath %>/<%= item.page %>" class="thumb-item">
                 <% if (item.hasThumb) { %>
                   <img src="<%= `/teletext/${currentPath}/${item.page}.png` %>" alt="Стр. <%= item.page %>">
                 <% } else { %>
@@ -258,7 +258,7 @@
       // Создаём кнопку редактирования
       const btn = document.createElement('a');
       btn.className = 'edit-btn-wrapper';
-      btn.href = `/edit-card/${encodeURIComponent(card.dataset.path)}`;
+      btn.href = `/edit-card/${card.dataset.path}`;
       btn.title = 'Редактировать карточку';
       btn.innerHTML = '<span>✏️</span>';
       btn.addEventListener('click', (e) => {

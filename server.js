@@ -43,29 +43,41 @@ const upload = multer({
 function decodeURIComponentSafely(str) {
     try { return decodeURIComponent(str); } catch (e) { return str; }
 }
+
 function isValidPath(p) {
     if (!p) return true;
+    // Разрешаем: буквы (латиница и кириллица), цифры, пробел, запятую, точку, дефис, подчёркивание, слэш
+    const allowedChars = /^[a-zA-Z\u0400-\u04FF0-9\s\,\.\-_\/]+$/;
+    if (!allowedChars.test(p)) {
+        return false;
+    }
+    // Запрещаем опасные последовательности
     return !p.includes('..') && !p.startsWith('/') && !p.includes(':') && !p.includes('\\') && !p.includes('\0');
 }
 
-
 // 🖼️ Генерация PNG
 async function generateThumbnail(htmlPath, pngPath) {
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-web-security'
-        ],
-        defaultViewport: { width: 800, height: 600 }
-    });
-    const page = await browser.newPage();
-    await page.goto(`file://${htmlPath}`, { waitUntil: 'networkidle2' });
-    await page.screenshot({ path: pngPath, type: 'png', fullPage: true });
-    await browser.close();
+    let browser;
+    try {
+        browser = await puppeteer.launch({
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-web-security'
+            ],
+            defaultViewport: { width: 800, height: 600 }
+        });
+        const page = await browser.newPage();
+        await page.goto(`file://${htmlPath}`, { waitUntil: 'networkidle2', timeout: 15000 });
+        await page.screenshot({ path: pngPath, type: 'png', fullPage: true });
+    } catch (err) {
+        throw err;
+    } finally {
+        if (browser) await browser.close();
+    }
 }
 
 const MAX_CONCURRENT = 3;
@@ -109,9 +121,14 @@ app.get('/about', (req, res) => {
 // 📁 Папка
 app.get('/folder/*', async (req, res) => {
     const requestedPath = req.params[0] || '';
-    if (!isValidPath(requestedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
+    let decodedPath = requestedPath;
+    if (requestedPath.includes('%')) {
+        try {
+            decodedPath = decodeURIComponent(requestedPath);
+        } catch (e) {}
+    }
+    if (!isValidPath(decodedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
 
-    const decodedPath = decodeURIComponentSafely(requestedPath);
     const fullPath = path.join(__dirname, 'teletext', decodedPath);
     if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
         return res.status(404).render('error', { message: 'Папка не найдена' });
@@ -179,9 +196,16 @@ app.get('/folder/*', async (req, res) => {
 app.get('/page/*/:page', async (req, res) => {
     const requestedPath = req.params[0] || '';
     const pageParam = req.params.page;
-    if (!isValidPath(requestedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
 
-    const decodedPath = decodeURIComponentSafely(requestedPath);
+    let decodedPath = requestedPath;
+    if (requestedPath.includes('%')) {
+        try {
+            decodedPath = decodeURIComponent(requestedPath);
+        } catch (e) {}
+    }
+
+    if (!isValidPath(decodedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
+
     const page = parseInt(pageParam, 10);
     if (isNaN(page) || page < 100 || page > 999) return res.status(400).render('error', { message: 'Некорректный номер страницы (100–999)' });
 
@@ -200,7 +224,7 @@ app.get('/page/*/:page', async (req, res) => {
     const pathParts = decodedPath.split('/').filter(Boolean);
     const breadcrumb = pathParts.map((part, i) => ({ name: part, path: pathParts.slice(0, i + 1).join('/') }));
     const pageList = pageNumbers.map(p => ({ page: p, hasThumb: fs.existsSync(path.join(fullPath, `${p}.png`)) }));
-    const basePath = `/teletext/${decodedPath}/`.replace(/ /g, '%20');
+    const basePath = `/teletext/${decodedPath}/`; // УБРАНО .replace(/ /g, '%20')
 
     const logoExists = fs.existsSync(path.join(fullPath, 'logo.svg'));
     const logoExistsPng = fs.existsSync(path.join(fullPath, 'logo.png'));
@@ -224,9 +248,14 @@ app.get('/page/*/:page', async (req, res) => {
 // ✨ Редактор карточки
 app.get('/edit-card/*', (req, res) => {
     const requestedPath = req.params[0] || '';
-    if (!isValidPath(requestedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
+    let decodedPath = requestedPath;
+    if (requestedPath.includes('%')) {
+        try {
+            decodedPath = decodeURIComponent(requestedPath);
+        } catch (e) {}
+    }
+    if (!isValidPath(decodedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
 
-    const decodedPath = decodeURIComponentSafely(requestedPath);
     const fullPath = path.join(__dirname, 'teletext', decodedPath);
     if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
         return res.status(404).render('error', { message: 'Папка не найдена' });
@@ -247,7 +276,7 @@ app.get('/edit-card/*', (req, res) => {
     const logoUrl = logoExists ? `/teletext/${decodedPath}/logo.svg` : logoExistsPng ? `/teletext/${decodedPath}/logo.png` : null;
 
     res.render('edit-card', {
-        archivePath: requestedPath,
+        archivePath: decodedPath, // Передаём decodedPath, а не raw
         folderName: path.basename(fullPath),
         currentTitle: title,
         hasLogo: logoExists || logoExistsPng,
@@ -258,12 +287,18 @@ app.get('/edit-card/*', (req, res) => {
 // 💾 Сохранение логотипа + названия
 app.post('/save-card/*', upload.single('logo'), (req, res) => {
     const requestedPath = req.params[0] || '';
-    if (!isValidPath(requestedPath)) {
+    let decodedPath = requestedPath;
+    if (requestedPath.includes('%')) {
+        try {
+            decodedPath = decodeURIComponent(requestedPath);
+        } catch (e) {}
+    }
+    if (!isValidPath(decodedPath)) {
         logAction('CARD_SAVE_FAIL', 'Недопустимый путь');
         return res.status(400).render('error', { message: 'Недопустимый путь' });
     }
 
-    const fullPath = path.join(__dirname, 'teletext', requestedPath);
+    const fullPath = path.join(__dirname, 'teletext', decodedPath);
     if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
         logAction('CARD_SAVE_FAIL', `Папка не найдена: ${requestedPath}`);
         return res.status(404).render('error', { message: 'Папка не найдена' });
@@ -272,16 +307,16 @@ app.post('/save-card/*', upload.single('logo'), (req, res) => {
     const newTitle = (req.body.title || '').trim();
     if (!newTitle) {
         logAction('CARD_SAVE_FAIL', 'Пустое название');
-        return res.redirect(`/edit-card/${requestedPath}`);
+        return res.redirect(`/edit-card/${decodedPath}`); // ← decodedPath
     }
 
     // 1️⃣ Сохраняем название
     const titleFile = path.join(fullPath, 'title.txt');
     try {
         fs.writeFileSync(titleFile, newTitle, 'utf-8');
-        logAction('TITLE_SAVED', `${newTitle} → ${requestedPath}`);
+        logAction('TITLE_SAVED', `${newTitle} → ${decodedPath}`);
     } catch (err) {
-        logAction('TITLE_SAVE_ERROR', `${requestedPath}: ${err.message}`);
+        logAction('TITLE_SAVE_ERROR', `${decodedPath}: ${err.message}`);
     }
 
     // 2️⃣ Сохраняем логотип (если загружен)
@@ -291,24 +326,30 @@ app.post('/save-card/*', upload.single('logo'), (req, res) => {
         try {
             fs.copyFileSync(req.file.path, targetPath);
             fs.unlinkSync(req.file.path);
-            logAction('LOGO_UPLOADED', `${targetName} → ${requestedPath}`);
+            logAction('LOGO_UPLOADED', `${targetName} → ${decodedPath}`);
         } catch (err) {
-            logAction('LOGO_UPLOAD_ERROR', `${requestedPath}: ${err.message}`);
+            logAction('LOGO_UPLOAD_ERROR', `${decodedPath}: ${err.message}`);
         }
     }
 
-    res.redirect(`/folder/${encodeURIComponent(requestedPath)}`);
+    res.redirect(`/folder/${decodedPath}`); // ← decodedPath
 });
 
 // 🗑 Удаление логотипа
 app.post('/logo-delete/*', (req, res) => {
     const requestedPath = req.params[0] || '';
-    if (!isValidPath(requestedPath)) {
+    let decodedPath = requestedPath;
+    if (requestedPath.includes('%')) {
+        try {
+            decodedPath = decodeURIComponent(requestedPath);
+        } catch (e) {}
+    }
+    if (!isValidPath(decodedPath)) {
         logAction('LOGO_DELETE_FAIL', 'Недопустимый путь');
         return res.status(400).render('error', { message: 'Недопустимый путь' });
     }
 
-    const fullPath = path.join(__dirname, 'teletext', requestedPath);
+    const fullPath = path.join(__dirname, 'teletext', decodedPath);
     if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
         logAction('LOGO_DELETE_FAIL', `Папка не найдена: ${requestedPath}`);
         return res.status(404).render('error', { message: 'Папка не найдена' });
@@ -328,10 +369,10 @@ app.post('/logo-delete/*', (req, res) => {
     }
 
     if (deleted.length > 0) {
-        logAction('LOGO_DELETED', `${deleted.join(', ')} из ${requestedPath}`);
+        logAction('LOGO_DELETED', `${deleted.join(', ')} из ${decodedPath}`);
     }
 
-    res.redirect(`/edit-card/${requestedPath}`);
+    res.redirect(`/edit-card/${decodedPath}`); // ← decodedPath
 });
 
 // 404

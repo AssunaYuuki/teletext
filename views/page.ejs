@@ -153,7 +153,7 @@
           <% if (i === breadcrumb.length - 1) { %>
             <span> → <%= crumb.name %></span>
           <% } else { %>
-            <a href="/folder/<%= encodeURIComponent(crumb.path) %>"> → <%= crumb.name %></a>
+            <a href="/folder/<%= crumb.path %>"> → <%= crumb.name %></a> <!-- УБРАНО encodeURIComponent -->
           <% } %>
         <% }) %>
       <% } %>
@@ -170,7 +170,7 @@
       <button id="prev" title="Предыдущая (←)" <%= prevPage === null ? 'disabled' : '' %>>◄</button>
       <input type="number" id="jump" min="100" max="999" value="<%= pageNumber %>" size="3">
       <button id="next" title="Следующая (→)" <%= nextPage === null ? 'disabled' : '' %>>►</button>
-      <a href="/folder/<%= encodeURIComponent(currentPath) %>" class="btn-list" style="display:inline-block; padding:6px 12px;">📁 Список</a>
+      <a href="/folder/<%= currentPath %>" class="btn-list" style="display:inline-block; padding:6px 12px;">📁 Список</a> <!-- УБРАНО encodeURIComponent -->
     </div>
   </header>
 
@@ -186,7 +186,7 @@
         <div class="grid">
           <% pageList.forEach(item => { %>
             <a
-              href="/page/<%= encodeURIComponent(currentPath) %>/<%= item.page %>"
+              href="/page/<%= currentPath %>/<%= item.page %>" <!-- УБРАНО encodeURIComponent -->
               class="thumb-item <%= item.page === pageNumber ? 'active' : '' %>">
               <% if (item.hasThumb) { %>
                 <img src="<%= `/teletext/${currentPath}/${item.page}.png` %>" alt="Стр. <%= item.page %>">
@@ -212,7 +212,7 @@
 
     function goToPage(num) {
       if (num === null || !allPages.includes(num)) return;
-      const encodedPath = folderPath ? encodeURIComponent(folderPath) : '';
+      const encodedPath = folderPath ? encodeURIComponent(folderPath) : ''; // ← Только при формировании URL
       window.location.href = `/page/${encodedPath}/${num}`;
     }
 
