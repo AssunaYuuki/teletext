@@ -398,11 +398,14 @@ app.post('/logo-delete/*', (req, res) => {
     res.redirect(`/edit-card/${decodedPath}`); // ← decodedPath
 });
 
+// 404
+app.use((req, res) => {
+    res.status(404).render('error', { message: 'Страница не найдена' });
+});
 
-// Автоматическое переименование папок с '&&' в формат xx.xx.xxxx
-// Автоматическое переименование ВСЕХ папок, где есть '&&.&&.&&&&' → '.10.11'
+// ✅ Автоматическое переименование папок с '&&.&&.&&&&', 'XX.XX.&&&&', 'XX.XX.&&&', 'XX.XX.&&'
 function autoRenameFoldersWithPattern(baseDir) {
-    console.log('[AUTO-RENAME] Поиск папок с "&&.&&.&&&&" во всём дереве...');
+    console.log('[AUTO-RENAME] Поиск папок с "&&.&&.&&&&", "XX.XX.&&&&", "XX.XX.&&&", "XX.XX.&&" во всём дереве...');
 
     function processDirectory(dir) {
         const items = fs.readdirSync(dir);
@@ -411,10 +414,26 @@ function autoRenameFoldersWithPattern(baseDir) {
             const stats = fs.statSync(fullPath);
 
             if (stats.isDirectory()) {
-                // Проверяем, содержит ли имя папки '&&.&&.&&&&'
+                let newName = null;
+
+                // 1. Проверяем '&&.&&.&&&&'
                 if (item.includes('&&.&&.&&&&')) {
-                    // Заменяем '&&.&&.&&&&' на '.10.11'
-                    const newName = item.replace('&&.&&.&&&&', 'xx.xx.xxxx');
+                    newName = item.replace('&&.&&.&&&&', 'xx.xx.xxxx');
+                }
+                // 2. Проверяем 'XX.XX.&&&&' (например, '12.09.&&&&')
+                else if (item.match(/.*\d+\.\d+\.&&&&$/)) {
+                    newName = item.replace('.&&&&', '.xxxx');
+                }
+                // 3. Проверяем 'XX.XX.&&&' (например, '10.11.&&&')
+                else if (item.match(/.*\d+\.\d+\.&&&$/)) {
+                    newName = item.replace('.&&&', '.xxx');
+                }
+                // 4. Проверяем 'XX.XX.&&' (например, '10.11.&&')
+                else if (item.match(/.*\d+\.\d+\.&&$/)) {
+                    newName = item.replace('.&&', '.xx');
+                }
+
+                if (newName !== null) {
                     const newFullPath = path.join(dir, newName);
 
                     // Проверяем, существует ли уже такая папка
@@ -427,11 +446,11 @@ function autoRenameFoldersWithPattern(baseDir) {
                         } catch (err) {
                             console.error(`[AUTO-RENAME] ❌ Ошибка при переименовании: ${err.message}`);
                         }
-                    }
 
-                    // Рекурсивно обрабатываем подпапки
-                    if (fs.existsSync(newFullPath)) {
-                        processDirectory(newFullPath);
+                        // Рекурсивно обрабатываем подпапки
+                        if (fs.existsSync(newFullPath)) {
+                            processDirectory(newFullPath);
+                        }
                     }
                 } else {
                     // Рекурсивно обрабатываем подпапки
@@ -452,11 +471,6 @@ if (fs.existsSync(teletextDir)) {
 } else {
     console.warn('[AUTO-RENAME] ❗ Папка teletext не найдена!');
 }
-
-// 404
-app.use((req, res) => {
-    res.status(404).render('error', { message: 'Страница не найдена' });
-});
 
 app.listen(port, () => {
     logAction('SERVER_START', `http://localhost:${port}`);
