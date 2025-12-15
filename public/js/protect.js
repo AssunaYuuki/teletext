@@ -73,6 +73,10 @@ document.addEventListener('dragstart', e => {
     });
 })();
 
+
+
+
+
 // Блокируем Ctrl+U, Ctrl+Shift+I, F12
 document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', e => {
