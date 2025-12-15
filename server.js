@@ -46,8 +46,8 @@ function decodeURIComponentSafely(str) {
 
 function isValidPath(p) {
     if (!p) return true;
-    // Разрешаем: буквы (лат. и кириллица), цифры, пробел, запятую, точку, дефис, подчёркивание, слэш
-    const allowedChars = /^[a-zA-Zа-яА-ЯёЁ0-9\s\\,\\.\-_/]+$/u;
+    // Разрешаем: буквы (лат. и кириллица), цифры, пробел, запятую, точку, дефис, подчёркивание, слэш, амперсанд, скобки
+    const allowedChars = /^[a-zA-Zа-яА-ЯёЁ0-9\s,. -_\/&()'\[\]{}@#~$%^*+=<>:;]+$/u;
     if (!allowedChars.test(p)) {
         return false;
     }
@@ -121,12 +121,13 @@ app.get('/about', (req, res) => {
 // 📁 Папка
 app.get('/folder/*', async (req, res) => {
     const requestedPath = req.params[0] || '';
-    let decodedPath = requestedPath;
-    if (requestedPath.includes('%')) {
-        try {
-            decodedPath = decodeURIComponent(requestedPath);
-        } catch (e) {}
+    let decodedPath;
+    try {
+        decodedPath = decodeURIComponent(requestedPath);
+    } catch (e) {
+        decodedPath = requestedPath; // если декодирование не удалось — оставляем как есть
     }
+
     if (!isValidPath(decodedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
 
     const fullPath = path.join(__dirname, 'teletext', decodedPath);
@@ -171,7 +172,6 @@ app.get('/folder/*', async (req, res) => {
         }
 
         // ✅ Читаем description.txt
-
         let description = '';
         const descFile = path.join(folderPath, 'description.txt');
         if (fs.existsSync(descFile)) {
@@ -179,7 +179,6 @@ app.get('/folder/*', async (req, res) => {
                 description = fs.readFileSync(descFile, 'utf-8').trim();
             } catch (e) {
                 logAction('DESC_READ_WARN', `Не удалось прочитать description.txt в ${folder}`);
-                logAction('DESC_READ', `${folder}: "${description}"`);
             }
         }
 
@@ -211,11 +210,11 @@ app.get('/page/*/:page', async (req, res) => {
     const requestedPath = req.params[0] || '';
     const pageParam = req.params.page;
 
-    let decodedPath = requestedPath;
-    if (requestedPath.includes('%')) {
-        try {
-            decodedPath = decodeURIComponent(requestedPath);
-        } catch (e) {}
+    let decodedPath;
+    try {
+        decodedPath = decodeURIComponent(requestedPath);
+    } catch (e) {
+        decodedPath = requestedPath; // если декодирование не удалось — оставляем как есть
     }
 
     if (!isValidPath(decodedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
@@ -262,12 +261,13 @@ app.get('/page/*/:page', async (req, res) => {
 // ✨ Редактор карточки
 app.get('/edit-card/*', (req, res) => {
     const requestedPath = req.params[0] || '';
-    let decodedPath = requestedPath;
-    if (requestedPath.includes('%')) {
-        try {
-            decodedPath = decodeURIComponent(requestedPath);
-        } catch (e) {}
+    let decodedPath;
+    try {
+        decodedPath = decodeURIComponent(requestedPath);
+    } catch (e) {
+        decodedPath = requestedPath; // если декодирование не удалось — оставляем как есть
     }
+
     if (!isValidPath(decodedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
 
     const fullPath = path.join(__dirname, 'teletext', decodedPath);
@@ -313,12 +313,13 @@ app.get('/edit-card/*', (req, res) => {
 // 💾 Сохранение логотипа + названия + описания
 app.post('/save-card/*', upload.single('logo'), (req, res) => {
     const requestedPath = req.params[0] || '';
-    let decodedPath = requestedPath;
-    if (requestedPath.includes('%')) {
-        try {
-            decodedPath = decodeURIComponent(requestedPath);
-        } catch (e) {}
+    let decodedPath;
+    try {
+        decodedPath = decodeURIComponent(requestedPath);
+    } catch (e) {
+        decodedPath = requestedPath; // если декодирование не удалось — оставляем как есть
     }
+
     if (!isValidPath(decodedPath)) {
         logAction('CARD_SAVE_FAIL', 'Недопустимый путь');
         return res.status(400).render('error', { message: 'Недопустимый путь' });
@@ -387,12 +388,13 @@ app.post('/save-card/*', upload.single('logo'), (req, res) => {
 // 🗑 Удаление логотипа
 app.post('/logo-delete/*', (req, res) => {
     const requestedPath = req.params[0] || '';
-    let decodedPath = requestedPath;
-    if (requestedPath.includes('%')) {
-        try {
-            decodedPath = decodeURIComponent(requestedPath);
-        } catch (e) {}
+    let decodedPath;
+    try {
+        decodedPath = decodeURIComponent(requestedPath);
+    } catch (e) {
+        decodedPath = requestedPath; // если декодирование не удалось — оставляем как есть
     }
+
     if (!isValidPath(decodedPath)) {
         logAction('LOGO_DELETE_FAIL', 'Недопустимый путь');
         return res.status(400).render('error', { message: 'Недопустимый путь' });
