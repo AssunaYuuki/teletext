@@ -70,12 +70,10 @@
     <p class="subtitle">Выберите страну или архив</p>
   </header>
 
-  <!-- 🔘 Горизонтальная панель стран с SVG-флагами -->
   <div class="country-bar">
     <% if (folders && folders.length > 0) { %>
       <% folders.forEach(folder => { %>
         <a href="/folder/<%= encodeURIComponent(folder) %>" class="country-btn">
-          <!-- 🇧🇾 SVG-флаги встроены прямо в HTML -->
           <%
             let flagSVG = '';
             switch(folder) {
