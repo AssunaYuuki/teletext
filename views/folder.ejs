@@ -300,17 +300,17 @@
                      onmouseenter="showEditButton(this)"
                      onmouseleave="hideEditButton(this)">
 
-
+                  <!-- Логотип -->
                   <% if (logoUrl) { %>
                     <img src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип" style="height:32px; max-width: 100%; object-fit: contain; margin-top:8px;">
                   <% } else { %>
                     <span style="color:#ffcc00;font-size:1.2rem;">🌐</span>
                   <% } %>
 
-
+                  <!-- Название -->
                   <span style="font-size:0.85rem; text-align:center; display:block; word-wrap:break-word; line-height:1.2; margin-top:6px;"><%= displayName %></span>
 
-
+                  <!-- Значок информации, если есть описание -->
                   <% if (description && description.trim()) { %>
                     <span class="info-icon" onclick="openModal('<%= displayName %>', '<%= description.replace(/'/g, "\\'").replace(/\n/g, "\\n") %>'); event.stopPropagation();">ℹ️</span>
                     <span class="tooltip">Описание</span>
@@ -353,7 +353,7 @@
     </div>
   </div>
 
-
+  <!-- Модальное окно -->
   <div id="modal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -402,19 +402,19 @@
       }
     }
 
-
+    // Открытие модального окна
     function openModal(title, description) {
       document.getElementById('modal-title').textContent = title;
       document.getElementById('modal-body').textContent = description;
       document.getElementById('modal').style.display = 'flex';
     }
 
-
+    // Закрытие модального окна
     function closeModal() {
       document.getElementById('modal').style.display = 'none';
     }
 
-
+    // Закрытие при клике вне окна
     window.onclick = function(event) {
       const modal = document.getElementById('modal');
       if (event.target === modal) {

@@ -40,10 +40,6 @@ const upload = multer({
 });
 
 // Вспомогательные функции
-function decodeURIComponentSafely(str) {
-    try { return decodeURIComponent(str); } catch (e) { return str; }
-}
-
 function isValidPath(p) {
     if (!p) return true;
     // Разрешаем: буквы (лат. и кириллица), цифры, пробел, запятую, точку, дефис, подчёркивание, слэш, амперсанд, скобки
@@ -121,13 +117,9 @@ app.get('/about', (req, res) => {
 // 📁 Папка
 app.get('/folder/*', async (req, res) => {
     const requestedPath = req.params[0] || '';
-    let decodedPath;
-    try {
-        decodedPath = decodeURIComponent(requestedPath);
-    } catch (e) {
-        decodedPath = requestedPath; // если декодирование не удалось — оставляем как есть
-    }
+    let decodedPath = requestedPath;
 
+    // Просто используем raw path — без декодирования
     if (!isValidPath(decodedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
 
     const fullPath = path.join(__dirname, 'teletext', decodedPath);
@@ -210,12 +202,7 @@ app.get('/page/*/:page', async (req, res) => {
     const requestedPath = req.params[0] || '';
     const pageParam = req.params.page;
 
-    let decodedPath;
-    try {
-        decodedPath = decodeURIComponent(requestedPath);
-    } catch (e) {
-        decodedPath = requestedPath; // если декодирование не удалось — оставляем как есть
-    }
+    let decodedPath = requestedPath;
 
     if (!isValidPath(decodedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
 
@@ -261,12 +248,7 @@ app.get('/page/*/:page', async (req, res) => {
 // ✨ Редактор карточки
 app.get('/edit-card/*', (req, res) => {
     const requestedPath = req.params[0] || '';
-    let decodedPath;
-    try {
-        decodedPath = decodeURIComponent(requestedPath);
-    } catch (e) {
-        decodedPath = requestedPath; // если декодирование не удалось — оставляем как есть
-    }
+    let decodedPath = requestedPath;
 
     if (!isValidPath(decodedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
 
@@ -313,12 +295,7 @@ app.get('/edit-card/*', (req, res) => {
 // 💾 Сохранение логотипа + названия + описания
 app.post('/save-card/*', upload.single('logo'), (req, res) => {
     const requestedPath = req.params[0] || '';
-    let decodedPath;
-    try {
-        decodedPath = decodeURIComponent(requestedPath);
-    } catch (e) {
-        decodedPath = requestedPath; // если декодирование не удалось — оставляем как есть
-    }
+    let decodedPath = requestedPath;
 
     if (!isValidPath(decodedPath)) {
         logAction('CARD_SAVE_FAIL', 'Недопустимый путь');
@@ -388,12 +365,7 @@ app.post('/save-card/*', upload.single('logo'), (req, res) => {
 // 🗑 Удаление логотипа
 app.post('/logo-delete/*', (req, res) => {
     const requestedPath = req.params[0] || '';
-    let decodedPath;
-    try {
-        decodedPath = decodeURIComponent(requestedPath);
-    } catch (e) {
-        decodedPath = requestedPath; // если декодирование не удалось — оставляем как есть
-    }
+    let decodedPath = requestedPath;
 
     if (!isValidPath(decodedPath)) {
         logAction('LOGO_DELETE_FAIL', 'Недопустимый путь');
@@ -425,6 +397,61 @@ app.post('/logo-delete/*', (req, res) => {
 
     res.redirect(`/edit-card/${decodedPath}`); // ← decodedPath
 });
+
+
+// Автоматическое переименование папок с '&&' в формат xx.xx.xxxx
+// Автоматическое переименование ВСЕХ папок, где есть '&&.&&.&&&&' → '.10.11'
+function autoRenameFoldersWithPattern(baseDir) {
+    console.log('[AUTO-RENAME] Поиск папок с "&&.&&.&&&&" во всём дереве...');
+
+    function processDirectory(dir) {
+        const items = fs.readdirSync(dir);
+        for (const item of items) {
+            const fullPath = path.join(dir, item);
+            const stats = fs.statSync(fullPath);
+
+            if (stats.isDirectory()) {
+                // Проверяем, содержит ли имя папки '&&.&&.&&&&'
+                if (item.includes('&&.&&.&&&&')) {
+                    // Заменяем '&&.&&.&&&&' на '.10.11'
+                    const newName = item.replace('&&.&&.&&&&', 'xx.xx.xxxx');
+                    const newFullPath = path.join(dir, newName);
+
+                    // Проверяем, существует ли уже такая папка
+                    if (fs.existsSync(newFullPath)) {
+                        console.log(`[AUTO-RENAME] ⚠️ Папка уже существует: ${newFullPath}`);
+                    } else {
+                        try {
+                            fs.renameSync(fullPath, newFullPath);
+                            console.log(`[AUTO-RENAME] ✅ Переименовано: ${fullPath} → ${newFullPath}`);
+                        } catch (err) {
+                            console.error(`[AUTO-RENAME] ❌ Ошибка при переименовании: ${err.message}`);
+                        }
+                    }
+
+                    // Рекурсивно обрабатываем подпапки
+                    if (fs.existsSync(newFullPath)) {
+                        processDirectory(newFullPath);
+                    }
+                } else {
+                    // Рекурсивно обрабатываем подпапки
+                    processDirectory(fullPath);
+                }
+            }
+        }
+    }
+
+    processDirectory(baseDir);
+    console.log('[AUTO-RENAME] Готово!');
+}
+
+// Запуск автоматического переименования при старте сервера
+const teletextDir = path.join(__dirname, 'teletext');
+if (fs.existsSync(teletextDir)) {
+    autoRenameFoldersWithPattern(teletextDir);
+} else {
+    console.warn('[AUTO-RENAME] ❗ Папка teletext не найдена!');
+}
 
 // 404
 app.use((req, res) => {
