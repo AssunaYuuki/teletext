@@ -5,7 +5,7 @@ const multer = require('multer');
 const os = require('os');
 const puppeteer = require('puppeteer');
 
-
+require('dotenv').config({quiet: true});
 
 function logAction(action, details = '') {
     const timestamp = new Date().toISOString();
@@ -14,7 +14,7 @@ function logAction(action, details = '') {
 }
 
 const app = express();
-const port = 3000;
+const port = process.env.HTTP_PORT || 3000;
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
