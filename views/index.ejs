@@ -151,9 +151,10 @@
     <small>By AssunaYuuki 2025 year</small>
   </footer>
 
+
 <script src="/js/protect.js"></script>
 <script>
-  // Обновление времени каждую секунду
+  // Обновление времени
   function updateLocalTime() {
     const now = new Date();
     const timeString = now.toLocaleTimeString('ru-RU', {
@@ -161,46 +162,54 @@
       minute: '2-digit',
       second: '2-digit'
     });
-    document.getElementById('localTime').textContent = timeString;
-
     const dateString = now.toLocaleDateString('ru-RU', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
     });
-    document.getElementById('localDate').textContent = dateString;
+    // Объединяем в один элемент, добавив его в HTML
+    document.querySelector('.time-display').innerHTML = `${dateString}<br>${timeString}`;
   }
 
   setInterval(updateLocalTime, 1000);
-  updateLocalTime(); // Установить сразу
+  updateLocalTime();
 
-  // Получение геолокации и погоды
+  // Функция получения погоды
   async function getWeatherAndLocation() {
     const weatherDisplay = document.getElementById('localWeather');
 
+    // Проверка протокола
+    if (location.protocol !== 'https:' && !location.host.includes('localhost')) {
+      weatherDisplay.textContent = 'HTTPS требуется для геолокации';
+      return;
+    }
+
     try {
-      // Попробовать получить местоположение пользователя
+      // Получение координат
       const position = await new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
-          throw new Error("Геолокация не поддерживается браузером");
+          reject(new Error("Геолокация не поддерживается"));
+          return;
         }
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 60000
+          timeout: 10000, // Увеличен таймаут
+          maximumAge: 300000 // Кэшировать до 5 минут
         });
       });
 
       const { latitude, longitude } = position.coords;
 
-      // Запрос к OpenWeatherMap API
-      const API_KEY = '674ca86e6c1ca2d60eb3317d58e0c5a7'; // Замените на ваш ключ API
-      const response = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&lang=ru&units=metric&appid=${API_KEY}`
-      );
+      // Запрос погоды через proxy или напрямую (в зависимости от CORS)
+      const API_KEY = '674ca86e6c1ca2d60eb3317d58e0c5a7';
+      // Используем CORS Anywhere proxy или делаем запрос на сервер
+      const proxyUrl = ''; // Можно использовать прокси, если нужно
+      const apiUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&lang=ru&units=metric&appid=${API_KEY}`;
+
+      const response = await fetch(apiUrl);
 
       if (!response.ok) {
-        throw new Error(`Ошибка получения погоды: ${response.status}`);
+        throw new Error(`OpenWeather: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -208,32 +217,38 @@
       const description = data.weather[0].description;
       const city = data.name;
 
-      weatherDisplay.innerHTML = `
-        <span>${city}</span>
-        <span>${temp}°C, ${description}</span>
-      `;
+      weatherDisplay.innerHTML = `<span>${city}</span>, <span>${temp}°C, ${description}</span>`;
     } catch (error) {
-      console.warn("Не удалось получить данные о погоде:", error.message);
+      console.error("Ошибка получения погоды:", error);
+      weatherDisplay.textContent = `Ошибка: ${error.message}`;
 
-      // Альтернатива: попытаться определить город по IP через сторонний сервис
-      try {
-        const ipResponse = await fetch('https://ipapi.co/json/');
-        if (!ipResponse.ok) throw new Error("Ошибка получения данных по IP");
+      // Вторичная попытка через IP, если геолокация не сработала
+      if (error.message.includes("geolocation") || error.message.includes("HTTPS")) {
+        try {
+          const ipResponse = await fetch('https://ipapi.co/json/', {
+            headers: { 'Accept': 'application/json' }
+          });
+          if (!ipResponse.ok) throw new Error("IP API недоступен");
 
-        const locationData = await ipResponse.json();
-        const city = locationData.city || "Неизвестный город";
-
-        // Просто показываем город, так как погода без API недоступна
-        weatherDisplay.innerHTML = `<span>${city}</span>`;
-      } catch (locationError) {
-        console.warn("Не удалось получить местоположение:", locationError.message);
-        weatherDisplay.textContent = "Город не определен";
+          const locData = await ipResponse.json();
+          weatherDisplay.innerHTML = `<span>${locData.city || 'Город'}</span>`;
+        } catch (ipErr) {
+          console.warn("Ошибка определения местоположения по IP:", ipErr.message);
+          weatherDisplay.textContent = 'Местоположение недоступно';
+        }
       }
     }
   }
 
-  // Загрузка погоды при загрузке страницы
-  document.addEventListener('DOMContentLoaded', getWeatherAndLocation);
+  // Запуск при полной загрузке DOM
+  document.addEventListener('DOMContentLoaded', () => {
+    // Проверка, есть ли доступ к геолокации
+    if ("geolocation" in navigator) {
+      getWeatherAndLocation();
+    } else {
+      document.getElementById('localWeather').textContent = 'Геолокация недоступна';
+    }
+  });
 </script>
 
 </body>
