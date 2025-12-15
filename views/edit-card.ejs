@@ -224,7 +224,7 @@
       border: 1px solid var(--accent);
       border-radius: 4px;
       display: block;
-      margin: 0 auto; /* Центрируем */
+      margin: 0 auto;
     }
 
     footer {
@@ -252,9 +252,39 @@
       33% { content: ' .  '; }
       66% { content: '  . '; }
     }
+
+    /* Уведомление */
+    .notification {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      background: rgba(0, 255, 153, 0.2);
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      color: var(--accent);
+      font-family: var(--font-mono);
+      z-index: 1000;
+      display: none;
+    }
+
+    .notification.show {
+      display: block;
+      animation: fadeInOut 3s ease;
+    }
+
+    @keyframes fadeInOut {
+      0% { opacity: 0; top: 10px; }
+      10% { opacity: 1; top: 20px; }
+      90% { opacity: 1; top: 20px; }
+      100% { opacity: 0; top: 10px; }
+    }
   </style>
 </head>
 <body class="crt">
+
+  <div class="notification" id="notification">✅ Сохранено!</div>
 
   <header>
     <h1>✏️ Редактор карточки</h1>
@@ -266,29 +296,29 @@
     <!-- Превью карточки -->
     <div class="card-preview">
       <% if (hasLogo) { %>
-        <img src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип">
+        <img id="preview-logo" src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип">
       <% } else { %>
-        <div style="height:45px; display:flex; align-items:center; justify-content:center; color:#ffcc00; font-size:1.5rem;">🌐</div>
+        <div id="preview-logo" style="height:45px; display:flex; align-items:center; justify-content:center; color:#ffcc00; font-size:1.5rem;">🌐</div>
       <% } %>
-      <div class="card-title"><%= currentTitle %></div>
+      <div class="card-title" id="preview-title"><%= currentTitle %></div>
     </div>
 
     <!-- Форма: логотип + название -->
-    <form method="POST" action="/save-card/<%= archivePath %>" enctype="multipart/form-data" onsubmit="this.querySelector('button[type=submit]').classList.add('loading'); this.querySelector('button[type=submit]').disabled = true; this.querySelector('button[type=submit]').textContent = 'Сохранение';">
+    <form id="edit-form" method="POST" action="/save-card/<%= archivePath %>" enctype="multipart/form-data">
       <div class="form-section">
         <h2>🖼️ Логотип</h2>
         <div class="form-group">
           <label>Текущий: <%= hasLogo ? '✅ Есть' : '❌ Нет' %></label>
           <% if (hasLogo) { %>
             <div class="logo-preview">
-              <img src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип">
+              <img id="current-logo" src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип">
             </div>
           <% } %>
         </div>
 
         <div class="form-group">
           <label>Загрузить новый (SVG/PNG/JPG)</label>
-          <input type="file" name="logo" accept=".svg,.png,.jpg,.jpeg">
+          <input type="file" name="logo" accept=".svg,.png,.jpg,.jpeg" id="logo-upload">
           <small>Оставьте пустым — логотип не изменится</small>
         </div>
       </div>
@@ -304,7 +334,7 @@
 
       <div class="btn-group">
         <button type="submit" class="btn">💾 Сохранить изменения</button>
-        <a href="/folder/<%= archivePath %>" class="btn">← Назад к папке</a>
+        <a href="#" class="btn" onclick="history.back(); return false;">← Отмена</a>
       </div>
     </form>
 
@@ -324,6 +354,73 @@
       <a href="/" class="btn" style="padding:6px 12px;">🏠 На главную</a>
     </footer>
   </div>
+
+  <script>
+    // Обработка формы без перезагрузки
+    document.getElementById('edit-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const formData = new FormData(this);
+      const submitBtn = this.querySelector('button[type=submit]');
+      const originalText = submitBtn.textContent;
+
+      // Индикатор загрузки
+      submitBtn.classList.add('loading');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Сохранение';
+
+      try {
+        const response = await fetch(this.action, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (response.ok) {
+          // Показать уведомление
+          document.getElementById('notification').classList.add('show');
+          setTimeout(() => {
+            document.getElementById('notification').classList.remove('show');
+          }, 3000);
+
+          // Обновить превью
+          const newTitle = formData.get('title');
+          document.getElementById('preview-title').textContent = newTitle;
+          document.getElementById('current-title').textContent = newTitle;
+
+          // Если был загружен логотип — обновить превью
+          const logoFile = formData.get('logo');
+          if (logoFile && logoFile.size > 0) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              document.getElementById('preview-logo').src = e.target.result;
+              document.getElementById('current-logo').src = e.target.result;
+            };
+            reader.readAsDataURL(logoFile);
+          }
+        } else {
+          alert('Ошибка при сохранении');
+        }
+      } catch (err) {
+        alert('Ошибка сети');
+      } finally {
+        submitBtn.classList.remove('loading');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+    });
+
+    // Предпросмотр логотипа при выборе файла
+    document.getElementById('logo-upload').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          document.getElementById('preview-logo').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  </script>
 
 </body>
 </html>
