@@ -5,7 +5,7 @@ const multer = require('multer');
 const os = require('os');
 const puppeteer = require('puppeteer');
 
-require('dotenv').config({quiet: true});
+require('dotenv').config({ quiet: true });
 
 function logAction(action, details = '') {
     const timestamp = new Date().toISOString();
@@ -47,7 +47,6 @@ function decodeURIComponentSafely(str) {
 function isValidPath(p) {
     if (!p) return true;
     // Разрешаем: буквы (лат. и кириллица), цифры, пробел, запятую, точку, дефис, подчёркивание, слэш
-    // ВАЖНО: только дефис нужно экранировать как \-
     const allowedChars = /^[a-zA-Zа-яА-ЯёЁ0-9\s\\,\\.\-_/]+$/u;
     if (!allowedChars.test(p)) {
         return false;
@@ -172,6 +171,7 @@ app.get('/folder/*', async (req, res) => {
         }
 
         // ✅ Читаем description.txt
+
         let description = '';
         const descFile = path.join(folderPath, 'description.txt');
         if (fs.existsSync(descFile)) {
@@ -179,6 +179,7 @@ app.get('/folder/*', async (req, res) => {
                 description = fs.readFileSync(descFile, 'utf-8').trim();
             } catch (e) {
                 logAction('DESC_READ_WARN', `Не удалось прочитать description.txt в ${folder}`);
+                logAction('DESC_READ', `${folder}: "${description}"`);
             }
         }
 

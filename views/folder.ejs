@@ -59,7 +59,7 @@
     }
 
     .card {
-      position: relative; /* ✅ Обязательно для абсолютного позиционирования */
+      position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -140,34 +140,110 @@
       border-radius: 3px;
     }
 
-    /* Подсказка — теперь работает корректно */
+    /* Значок информации */
+    .info-icon {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      font-size: 0.7rem;
+      color: #00ffaa;
+      opacity: 0.7;
+      transition: opacity 0.2s ease;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    .card:hover .info-icon {
+      opacity: 1;
+    }
+
+    /* Подсказка к значку */
     .tooltip {
       position: absolute;
+      top: 20px;
+      left: 0;
+      white-space: nowrap;
+      font-size: 0.7rem;
+      color: var(--accent);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      pointer-events: none;
+      z-index: 11;
+    }
+
+    .info-icon:hover + .tooltip,
+    .info-icon:focus + .tooltip {
+      opacity: 1;
+    }
+
+    /* Модальное окно */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
       top: 0;
-      left: 100%;
-      margin-left: 10px;
-      padding: 10px;
-      background: rgba(14, 20, 16, 0.9);
-      border: 1px solid var(--accent);
-      border-radius: 4px;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background: var(--card-bg);
+      border: 2px solid var(--accent);
+      border-radius: 6px;
+      padding: 20px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 0 20px rgba(0, 255, 153, 0.5);
+      position: relative;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .modal-title {
+      color: var(--accent);
+      font-size: 1.2rem;
+    }
+
+    .close {
+      color: #ff6666;
+      font-size: 1.5rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .modal-body {
       color: var(--fg);
       font-size: 0.9rem;
       white-space: pre-line;
-      z-index: 100;
-      display: none;
-      box-shadow: 0 0 10px rgba(0, 255, 153, 0.3);
-      max-width: 250px;
       line-height: 1.4;
-      /* ✅ Анимация появления */
-      opacity: 0;
-      transform: translateX(10px);
-      transition: opacity 0.2s ease, transform 0.2s ease;
     }
 
-    .card:hover .tooltip {
-      display: block;
-      opacity: 1;
-      transform: translateX(0);
+    .modal-footer {
+      margin-top: 15px;
+      text-align: right;
+    }
+
+    .btn-close {
+      background: var(--card-bg);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .btn-close:hover {
+      background: var(--accent);
+      color: var(--bg);
     }
   </style>
 </head>
@@ -234,9 +310,10 @@
                   <!-- Название -->
                   <span style="font-size:0.85rem; text-align:center; display:block; word-wrap:break-word; line-height:1.2; margin-top:6px;"><%= displayName %></span>
 
-                  <!-- Подсказка -->
+                  <!-- Значок информации, если есть описание -->
                   <% if (description && description.trim()) { %>
-                    <div class="tooltip"><%= description %></div>
+                    <span class="info-icon" onclick="openModal('<%= displayName %>', '<%= description.replace(/'/g, "\\'").replace(/\n/g, "\\n") %>')">ℹ️</span>
+                    <span class="tooltip">Описание</span>
                   <% } %>
 
                 </a>
@@ -276,6 +353,22 @@
     </div>
   </div>
 
+  <!-- Модальное окно -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-title">Описание канала</div>
+        <span class="close" onclick="closeModal()">&times;</span>
+      </div>
+      <div class="modal-body" id="modal-body">
+        <!-- Текст будет вставлен здесь -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-close" onclick="closeModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     function updateHeaderLogo(card) {
       const logoUrl = card.getAttribute('data-logo');
@@ -306,6 +399,26 @@
       const btn = card.querySelector('.edit-btn-wrapper');
       if (btn) {
         card.removeChild(btn);
+      }
+    }
+
+    // Открытие модального окна
+    function openModal(title, description) {
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-body').textContent = description;
+      document.getElementById('modal').style.display = 'flex';
+    }
+
+    // Закрытие модального окна
+    function closeModal() {
+      document.getElementById('modal').style.display = 'none';
+    }
+
+    // Закрытие при клике вне окна
+    window.onclick = function(event) {
+      const modal = document.getElementById('modal');
+      if (event.target === modal) {
+        closeModal();
       }
     }
   </script>
