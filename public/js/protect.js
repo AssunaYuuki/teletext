@@ -406,6 +406,6 @@ document.createDocumentType = function() {
 };
 
 // Блокируем document.createProcessingInstruction
-document.createDocumentType = function() {
-    throw new Error('createProcessingInstruction запрещён');
+document.createProcessingInstruction = function() {
+    throw new Error('createProcessingInstruction');
 };
