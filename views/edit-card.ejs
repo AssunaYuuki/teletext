@@ -104,6 +104,9 @@
       object-fit: contain;
       margin-bottom: 10px;
       border-radius: 4px;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .card-preview .card-title {
@@ -220,6 +223,8 @@
       max-width: 100%;
       border: 1px solid var(--accent);
       border-radius: 4px;
+      display: block;
+      margin: 0 auto; /* Центрируем */
     }
 
     footer {
@@ -229,6 +234,23 @@
       border-top: 1px dashed var(--accent);
       font-size: 0.85rem;
       opacity: 0.6;
+    }
+
+    /* Индикатор загрузки */
+    .loading {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .loading::after {
+      content: ' ...';
+      animation: dot 1s steps(3, end) infinite;
+    }
+
+    @keyframes dot {
+      0% { content: ' ...'; }
+      33% { content: ' .  '; }
+      66% { content: '  . '; }
     }
   </style>
 </head>
@@ -241,6 +263,7 @@
   </header>
 
   <div class="edit-container">
+    <!-- Превью карточки -->
     <div class="card-preview">
       <% if (hasLogo) { %>
         <img src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип">
@@ -250,8 +273,8 @@
       <div class="card-title"><%= currentTitle %></div>
     </div>
 
-
-    <form method="POST" action="/save-card/<%= archivePath %>" enctype="multipart/form-data">
+    <!-- Форма: логотип + название -->
+    <form method="POST" action="/save-card/<%= archivePath %>" enctype="multipart/form-data" onsubmit="this.querySelector('button[type=submit]').classList.add('loading'); this.querySelector('button[type=submit]').disabled = true; this.querySelector('button[type=submit]').textContent = 'Сохранение';">
       <div class="form-section">
         <h2>🖼️ Логотип</h2>
         <div class="form-group">
@@ -285,7 +308,7 @@
       </div>
     </form>
 
-
+    <!-- Удаление логотипа -->
     <% if (hasLogo) { %>
       <div class="form-section" style="border-color: #ff6666; background: rgba(20, 10, 10, 0.8);">
         <h2 style="color: #ff6666;">🗑 Удалить логотип</h2>
