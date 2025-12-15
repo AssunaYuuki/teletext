@@ -59,7 +59,7 @@
     }
 
     .card {
-      position: relative;
+      position: relative; /* ✅ Обязательно для абсолютного позиционирования */
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -140,7 +140,7 @@
       border-radius: 3px;
     }
 
-    /* Подсказка */
+    /* Подсказка — теперь работает корректно */
     .tooltip {
       position: absolute;
       top: 0;
@@ -158,10 +158,16 @@
       box-shadow: 0 0 10px rgba(0, 255, 153, 0.3);
       max-width: 250px;
       line-height: 1.4;
+      /* ✅ Анимация появления */
+      opacity: 0;
+      transform: translateX(10px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
     }
 
     .card:hover .tooltip {
       display: block;
+      opacity: 1;
+      transform: translateX(0);
     }
   </style>
 </head>
@@ -229,7 +235,7 @@
                   <span style="font-size:0.85rem; text-align:center; display:block; word-wrap:break-word; line-height:1.2; margin-top:6px;"><%= displayName %></span>
 
                   <!-- Подсказка -->
-                  <% if (description) { %>
+                  <% if (description && description.trim()) { %>
                     <div class="tooltip"><%= description %></div>
                   <% } %>
 
