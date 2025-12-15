@@ -475,7 +475,6 @@ if (fs.existsSync(teletextDir)) {
     console.warn('[AUTO-RENAME] ❗ Папка teletext не найдена!');
 }
 
-
 app.listen(port, () => {
     logAction('SERVER_START', `http://localhost:${port}`);
     console.log(`✅ Телетекст-плеер запущен: http://localhost:${port}`);
