@@ -475,10 +475,6 @@ if (fs.existsSync(teletextDir)) {
     console.warn('[AUTO-RENAME] ❗ Папка teletext не найдена!');
 }
 
-// ✅ Защита от просмотра кода — подмена HTML на 1.ejs
-app.get('*', (req, res) => {
-    res.render('1', { disableCopy: true });
-});
 
 app.listen(port, () => {
     logAction('SERVER_START', `http://localhost:${port}`);

@@ -100,12 +100,6 @@
 </head>
 <body>
 
-  <!-- Блок с погодой и временем -->
-  <div class="weather-time-header">
-    <div class="time-display" id="localTime">--:--:--</div>
-    <div class="weather-display" id="localWeather">Загрузка...</div>
-  </div>
-
   <header>
     <h1>📺 Телетекст Плеер</h1>
     <p class="subtitle">Выберите страну или архив</p>
@@ -150,110 +144,6 @@
     <a href="/about" class="btn">ℹ️ О проекте</a>
     <small>By AssunaYuuki 2025 year</small>
   </footer>
-
-    <!-- Индикатор загрузки -->
-    <div id="loadingIndicator" class="loading-indicator">
-      <div class="loading-bar"></div>
-    </div>
-
-<script src="/js/protect.js"></script>
-<script>
-  // Обновление времени
-  function updateLocalTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('ru-RU', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-    const dateString = now.toLocaleDateString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-    // Объединяем в один элемент, добавив его в HTML
-    document.querySelector('.time-display').innerHTML = `${dateString}<br>${timeString}`;
-  }
-
-  setInterval(updateLocalTime, 1000);
-  updateLocalTime();
-
-  // Функция получения погоды
-  async function getWeatherAndLocation() {
-    const weatherDisplay = document.getElementById('localWeather');
-
-    // Проверка протокола
-    if (location.protocol !== 'https:' && !location.host.includes('localhost')) {
-      weatherDisplay.textContent = 'HTTPS требуется для геолокации';
-      return;
-    }
-
-    try {
-      // Получение координат
-      const position = await new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject(new Error("Геолокация не поддерживается"));
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000, // Увеличен таймаут
-          maximumAge: 300000 // Кэшировать до 5 минут
-        });
-      });
-
-      const { latitude, longitude } = position.coords;
-
-      // Запрос погоды через proxy или напрямую (в зависимости от CORS)
-      const API_KEY = '674ca86e6c1ca2d60eb3317d58e0c5a7';
-      // Используем CORS Anywhere proxy или делаем запрос на сервер
-      const proxyUrl = ''; // Можно использовать прокси, если нужно
-      const apiUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&lang=ru&units=metric&appid=${API_KEY}`;
-
-      const response = await fetch(apiUrl);
-
-      if (!response.ok) {
-        throw new Error(`OpenWeather: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const temp = Math.round(data.main.temp);
-      const description = data.weather[0].description;
-      const city = data.name;
-
-      weatherDisplay.innerHTML = `<span>${city}</span>, <span>${temp}°C, ${description}</span>`;
-    } catch (error) {
-      console.error("Ошибка получения погоды:", error);
-      weatherDisplay.textContent = `Ошибка: ${error.message}`;
-
-      // Вторичная попытка через IP, если геолокация не сработала
-      if (error.message.includes("geolocation") || error.message.includes("HTTPS")) {
-        try {
-          const ipResponse = await fetch('https://ipapi.co/json/', {
-            headers: { 'Accept': 'application/json' }
-          });
-          if (!ipResponse.ok) throw new Error("IP API недоступен");
-
-          const locData = await ipResponse.json();
-          weatherDisplay.innerHTML = `<span>${locData.city || 'Город'}</span>`;
-        } catch (ipErr) {
-          console.warn("Ошибка определения местоположения по IP:", ipErr.message);
-          weatherDisplay.textContent = 'Местоположение недоступно';
-        }
-      }
-    }
-  }
-
-  // Запуск при полной загрузке DOM
-  document.addEventListener('DOMContentLoaded', () => {
-    // Проверка, есть ли доступ к геолокации
-    if ("geolocation" in navigator) {
-      getWeatherAndLocation();
-    } else {
-      document.getElementById('localWeather').textContent = 'Геолокация недоступна';
-    }
-  });
-
 
 </script>
 
