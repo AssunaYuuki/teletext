@@ -253,13 +253,12 @@
       66% { content: '  . '; }
     }
 
-    /* Уведомление */
+    /* Уведомление справа сверху */
     .notification {
       position: fixed;
       top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 10px 20px;
+      right: 20px;
+      padding: 12px 20px;
       background: rgba(0, 255, 153, 0.2);
       border: 1px solid var(--accent);
       border-radius: 4px;
@@ -267,18 +266,18 @@
       font-family: var(--font-mono);
       z-index: 1000;
       display: none;
+      box-shadow: 0 0 10px rgba(0, 255, 153, 0.3);
+      transform: translateX(120%);
+      transition: transform 0.3s ease;
     }
 
     .notification.show {
       display: block;
-      animation: fadeInOut 3s ease;
+      transform: translateX(0);
     }
 
-    @keyframes fadeInOut {
-      0% { opacity: 0; top: 10px; }
-      10% { opacity: 1; top: 20px; }
-      90% { opacity: 1; top: 20px; }
-      100% { opacity: 0; top: 10px; }
+    .notification.hide {
+      transform: translateX(120%);
     }
   </style>
 </head>
@@ -377,15 +376,19 @@
 
         if (response.ok) {
           // Показать уведомление
-          document.getElementById('notification').classList.add('show');
+          const notification = document.getElementById('notification');
+          notification.classList.add('show');
           setTimeout(() => {
-            document.getElementById('notification').classList.remove('show');
-          }, 3000);
+            notification.classList.add('hide');
+            setTimeout(() => {
+              notification.classList.remove('show');
+              notification.classList.remove('hide');
+            }, 300);
+          }, 2000);
 
           // Обновить превью
           const newTitle = formData.get('title');
           document.getElementById('preview-title').textContent = newTitle;
-          document.getElementById('current-title').textContent = newTitle;
 
           // Если был загружен логотип — обновить превью
           const logoFile = formData.get('logo');
@@ -398,10 +401,10 @@
             reader.readAsDataURL(logoFile);
           }
         } else {
-          alert('Ошибка при сохранении');
+          alert('Ошибка при сохранении: ' + response.status);
         }
       } catch (err) {
-        alert('Ошибка сети');
+        alert('Ошибка сети: ' + err.message);
       } finally {
         submitBtn.classList.remove('loading');
         submitBtn.disabled = false;
