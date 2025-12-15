@@ -338,3 +338,32 @@ img, a {
     -o-user-drag: none;
     user-drag: none;
 }
+
+/* Стили индикатора загрузки */
+.loading-indicator {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: transparent;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.loading-indicator.show {
+    opacity: 1;
+}
+
+.loading-bar {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, var(--accent), #00ffaa);
+    animation: loadingAnimation 1.5s infinite ease-in-out;
+}
+
+@keyframes loadingAnimation {
+    0% { width: 0%; }
+    100% { width: 100%; }
+}
