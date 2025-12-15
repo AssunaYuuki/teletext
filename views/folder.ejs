@@ -291,14 +291,14 @@
                 const description = card.description || ''; // ✅ Получаем описание
             %>
               <div class="card-container" style="position:relative; display:inline-block;">
-                <a href="/folder/<%= currentPath ? currentPath + '/' + folder : folder %>"
-                   class="card"
-                   data-logo="<%= logoUrl || '' %>"
-                   data-folder="<%= folder %>"
-                   data-path="<%= currentPath ? currentPath + '/' + folder : folder %>"
-                   onclick="updateHeaderLogo(this); return true;"
-                   onmouseenter="showEditButton(this)"
-                   onmouseleave="hideEditButton(this)">
+                <!-- Карточка без href — чтобы не было перехода -->
+                <div class="card"
+                     data-logo="<%= logoUrl || '' %>"
+                     data-folder="<%= folder %>"
+                     data-path="<%= currentPath ? currentPath + '/' + folder : folder %>"
+                     onclick="updateHeaderLogo(this); window.location.href='/folder/<%= currentPath ? currentPath + '/' + folder : folder %>';"
+                     onmouseenter="showEditButton(this)"
+                     onmouseleave="hideEditButton(this)">
 
                   <!-- Логотип -->
                   <% if (logoUrl) { %>
@@ -312,11 +312,11 @@
 
                   <!-- Значок информации, если есть описание -->
                   <% if (description && description.trim()) { %>
-                    <span class="info-icon" onclick="openModal('<%= displayName %>', '<%= description.replace(/'/g, "\\'").replace(/\n/g, "\\n") %>')">ℹ️</span>
+                    <span class="info-icon" onclick="openModal('<%= displayName %>', '<%= description.replace(/'/g, "\\'").replace(/\n/g, "\\n") %>'); event.stopPropagation();">ℹ️</span>
                     <span class="tooltip">Описание</span>
                   <% } %>
 
-                </a>
+                </div>
               </div>
             <% }) %>
           </div>
