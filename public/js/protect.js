@@ -140,140 +140,16 @@ Object.defineProperty(navigator, 'userAgent', {
     get: () => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 });
 
-// Блокируем window.location
-Object.defineProperty(window, 'location', {
-    get: () => ({
-        href: 'https://localhost:3000',
-        protocol: 'http:',
-        host: 'localhost:3000',
-        hostname: 'localhost',
-        port: '3000',
-        pathname: '/',
-        search: '',
-        hash: ''
-    }),
-    set: () => {}
-});
-
 // Блокируем document.write
 document.write = function() {
     throw new Error('document.write запрещён');
 };
-
-// Блокируем document.body
-Object.defineProperty(document, 'body', {
-    get: () => ({
-        innerHTML: '<h1></h1><p></p>',
-        style: {}
-    }),
-    set: () => {}
-});
-
-// Блокируем document.documentElement
-Object.defineProperty(document, 'documentElement', {
-    get: () => ({
-        innerHTML: '<h1></h1><p></p>',
-        style: {}
-    }),
-    set: () => {}
-});
-
-// Блокируем document.head
-Object.defineProperty(document, 'head', {
-    get: () => ({
-        innerHTML: '<title>Телетекст</title>',
-        style: {}
-    }),
-    set: () => {}
-});
-
-// Блокируем document.title
-Object.defineProperty(document, 'title', {
-    get: () => 'Телетекст',
-    set: () => {}
-});
-
-// Блокируем document.cookie
-Object.defineProperty(document, 'cookie', {
-    get: () => '',
-    set: () => {}
-});
-
-// Блокируем document.domain
-Object.defineProperty(document, 'domain', {
-    get: () => 'localhost',
-    set: () => {}
-});
-
-// Блокируем document.referrer
-Object.defineProperty(document, 'referrer', {
-    get: () => '',
-    set: () => {}
-});
-
-// Блокируем document.URL
-Object.defineProperty(document, 'URL', {
-    get: () => 'https://localhost:3000',
-    set: () => {}
-});
-
-// Блокируем document.documentURI
-Object.defineProperty(document, 'documentURI', {
-    get: () => 'https://localhost:3000',
-    set: () => {}
-});
-
-// Блокируем document.lastModified
-Object.defineProperty(document, 'lastModified', {
-    get: () => '01/01/1970 00:00:00',
-    set: () => {}
-});
-
-// Блокируем document.readyState
-Object.defineProperty(document, 'readyState', {
-    get: () => 'complete',
-    set: () => {}
-});
-
-// Блокируем document.characterSet
-Object.defineProperty(document, 'characterSet', {
-    get: () => 'UTF-8',
-    set: () => {}
-});
-
-// Блокируем document.contentType
-Object.defineProperty(document, 'contentType', {
-    get: () => 'text/html',
-    set: () => {}
-});
-
-// Блокируем document.doctype
-Object.defineProperty(document, 'doctype', {
-    get: () => ({
-        name: 'html',
-        publicId: '',
-        systemId: ''
-    }),
-    set: () => {}
-});
-
-// Блокируем document.implementation
-Object.defineProperty(document, 'implementation', {
-    get: () => ({
-        createDocumentType: () => ({})
-    }),
-    set: () => {}
-});
 
 // Блокируем document.createDocumentFragment
 document.createDocumentFragment = function() {
     throw new Error('createDocumentFragment запрещён');
 };
 
-// Блокируем document.createElement
-document.createElement = function() {
-    throw new Error('createElement запрещён');
-};
 
 // Блокируем document.createTextNode
 document.createTextNode = function() {
@@ -407,5 +283,5 @@ document.createDocumentType = function() {
 
 // Блокируем document.createProcessingInstruction
 document.createProcessingInstruction = function() {
-    throw new Error('createProcessingInstruction');
+    throw new Error('createProcessingInstruction запрещён');
 };
