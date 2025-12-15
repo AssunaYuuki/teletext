@@ -320,6 +320,7 @@ footer {
 }
 
 /* Запрет правой кнопки мыши */
+
 body {
     oncontextmenu="return false;"
 }

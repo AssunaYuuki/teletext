@@ -58,9 +58,7 @@ document.addEventListener('dragstart', e => {
             devtools.open = true;
             devtools.orientation = orientation;
             emitEvent('devtoolsopen');
-            // Заменяем HTML на пустой
-            document.body.innerHTML = '<h1>А фиг тебе! Код не для тебя 😈</h1><p>Ты попытался посмотреть код — и проиграл.</p>';
-            alert('А фиг тебе! Код не для тебя 😈');
+
         } else if (
             !(widthThreshold || heightThreshold)
             && devtools.open
@@ -80,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', e => {
         if (e.ctrlKey && e.key === 'u') {
             e.preventDefault();
-');
+
         }
         if (e.ctrlKey && e.shiftKey && e.key === 'I') {
             e.preventDefault();
@@ -92,4 +90,3 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
-
