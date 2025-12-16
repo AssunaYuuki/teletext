@@ -67,7 +67,7 @@ const uploadFiles = multer({
         }
     }),
     fileFilter: (req, file, cb) => {
-        const allowed = ['.html', '.png', '.svg', '.txt'];
+        const allowed = ['.html', '.png', '.svg', '.css', '.ttf', '.txt' ];
         const ext = path.extname(file.originalname).toLowerCase();
         if (allowed.includes(ext)) {
             cb(null, true);
@@ -554,8 +554,8 @@ app.post('/delete-item/*', (req, res) => {
     }
 });
 
-// ✅ Загрузка файлов (включая папки через drag’n’drop)
-app.post('/upload/*', uploadFiles.array('files', 50), async (req, res) => {
+// ✅ Загрузка файлов (включая папки через drag’n’drop) — альтернатива
+app.post('/upload/*', uploadFiles.any(), async (req, res) => {
     const requestedPath = req.params[0] || '';
 
     if (!isValidPath(requestedPath)) {
@@ -567,12 +567,13 @@ app.post('/upload/*', uploadFiles.array('files', 50), async (req, res) => {
         return res.status(404).json({ error: 'Папка не найдена' });
     }
 
-    const errors = [];
-    const saved = [];
-
+    // req.files может быть undefined, если не переданы файлы
     if (!req.files || req.files.length === 0) {
         return res.status(400).json({ error: 'Нет файлов для загрузки' });
     }
+
+    const errors = [];
+    const saved = [];
 
     for (const file of req.files) {
         try {
