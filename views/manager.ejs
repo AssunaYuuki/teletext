@@ -44,6 +44,20 @@
       box-shadow: var(--glow);
     }
 
+    .breadcrumb {
+      font-size: 0.9rem;
+      margin-bottom: 10px;
+    }
+
+    .breadcrumb a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+
     .items-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -123,28 +137,114 @@
       padding: 40px;
       opacity: 0.7;
     }
+
+    /* Drag & Drop */
+    #drop-zone {
+      border: 2px dashed var(--accent);
+      border-radius: 6px;
+      padding: 40px;
+      text-align: center;
+      color: var(--accent);
+      margin: 20px 0;
+      transition: all 0.2s ease;
+      background: rgba(14, 20, 16, 0.3);
+    }
+
+    #drop-zone.drag-over {
+      background: rgba(0, 255, 153, 0.1);
+      border-color: #00ffaa;
+      transform: scale(1.02);
+    }
+
+    #drop-zone p {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    /* Progress bar */
+    #progress-container {
+      display: none;
+      margin: 10px 0;
+      background: var(--hover-bg);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    #progress-bar {
+      height: 10px;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.2s ease;
+    }
+
+    #progress-text {
+      font-size: 0.8rem;
+      color: var(--accent);
+      margin-top: 5px;
+    }
+
+    /* Uploading animation */
+    .uploading-card {
+      position: relative;
+      opacity: 0.7;
+    }
+
+    .uploading-card .item-preview::after {
+      content: "🌀";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.5rem;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
   </style>
 </head>
 <body>
 
   <header>
     <h1>📁 Менеджер архивов</h1>
-    <p class="subtitle">teletext/ — управление файлами и папками</p>
+    <div class="breadcrumb">
+      <a href="/">🏠 Главная</a>
+      <a href="/manager/"> / teletext</a>
+      <% if (breadcrumb && breadcrumb.length > 0) { %>
+        <% breadcrumb.forEach((crumb, i) => { %>
+          <% if (i === breadcrumb.length - 1) { %>
+            <span> → <%= crumb.name %></span>
+          <% } else { %>
+            <a href="/manager/<%= encodeURIComponent(crumb.path) %>"> → <%= crumb.name %></a>
+          <% } %>
+        <% }) %>
+      <% } %>
+    </div>
   </header>
 
   <div class="manager-container">
     <div class="controls">
       <input type="text" id="folder-name" placeholder="Имя новой папки">
       <button onclick="createFolder()">➕ Создать папку</button>
-      <input type="file" id="file-input" multiple accept=".html,.png,.svg,.txt">
-      <button onclick="document.getElementById('file-input').click()">⬆️ Загрузить файлы</button>
+      <input type="file" id="file-input" multiple directory webkitdirectory accept=".html,.png,.svg,.txt" />
+      <button onclick="document.getElementById('file-input').click()">⬆️ Загрузить файлы/папки</button>
+    </div>
+
+    <div id="drop-zone" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);" ondragleave="dragLeaveHandler(event);">
+      <p>📁 Перетащите файлы или папки сюда для загрузки</p>
+    </div>
+
+    <div id="progress-container">
+      <div id="progress-bar"></div>
+      <div id="progress-text">Загрузка...</div>
     </div>
 
     <div class="items-grid" id="items-list">
       <% if (folders.length === 0 && files.length === 0) { %>
         <div class="empty-state">
-          <p>📁 Папка <code>teletext/</code> пуста</p>
-          <p>Создайте папку или загрузите файлы</p>
+          <p>📁 Папка пуста</p>
         </div>
       <% } %>
 
@@ -153,9 +253,11 @@
           <div class="item-actions">
             <button title="Удалить папку" onclick="deleteItem('<%= folder.name %>', 'folder')">✕</button>
           </div>
-          <div class="item-preview">📂</div>
-          <div class="item-name"><%= folder.name %></div>
-          <div class="item-size"><%= folder.isEmpty ? 'пустая' : 'есть содержимое' %></div>
+          <a href="/manager/<%= encodeURIComponent(folder.path) %>" style="display:block; text-decoration:none; color:inherit;">
+            <div class="item-preview">📂</div>
+            <div class="item-name"><%= folder.name %></div>
+            <div class="item-size"><%= folder.isEmpty ? 'пустая' : 'есть содержимое' %></div>
+          </a>
         </div>
       <% }) %>
 
@@ -189,7 +291,7 @@
       if (!name) return alert('Введите имя папки');
 
       try {
-        const res = await fetch('/create-folder', {
+        const res = await fetch(`/create-folder/<%= encodeURIComponent(currentPath) %>`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name })
@@ -212,27 +314,113 @@
       const formData = new FormData();
       files.forEach(f => formData.append('files', f));
 
+      await uploadFiles(formData);
+    };
+
+    async function uploadFiles(formData) {
+      const progressContainer = document.getElementById('progress-container');
+      const progressBar = document.getElementById('progress-bar');
+      const progressText = document.getElementById('progress-text');
+
+      progressContainer.style.display = 'block';
+
+      // Имитация прогресса
+      let progress = 0;
+      const interval = setInterval(() => {
+        if (progress < 90) {
+          progress += 5;
+          progressBar.style.width = progress + '%';
+          progressText.textContent = `Загрузка... ${progress}%`;
+        }
+      }, 200);
+
       try {
-        const res = await fetch('/upload/', {
+        const res = await fetch(`/upload/<%= encodeURIComponent(currentPath) %>`, {
           method: 'POST',
           body: formData
         });
+        clearInterval(interval);
         const data = await res.json();
+
         if (data.success || data.saved) {
-          location.reload();
+          progressBar.style.width = '100%';
+          progressText.textContent = '✅ Загрузка завершена!';
+          setTimeout(() => {
+            location.reload();
+          }, 500);
         } else {
-          alert(data.error || 'Ошибка загрузки');
+          clearInterval(interval);
+          progressBar.style.width = '100%';
+          progressText.textContent = '❌ Ошибка';
+          setTimeout(() => {
+            alert(data.error || 'Ошибка загрузки');
+            progressContainer.style.display = 'none';
+          }, 1000);
         }
       } catch (err) {
-        alert('Ошибка сети');
+        clearInterval(interval);
+        progressBar.style.width = '100%';
+        progressText.textContent = '❌ Ошибка сети';
+        setTimeout(() => {
+          alert('Ошибка сети');
+          progressContainer.style.display = 'none';
+        }, 1000);
       }
-    };
+    }
+
+    // Drag & Drop handlers
+    function dragOverHandler(ev) {
+      ev.preventDefault();
+      document.getElementById('drop-zone').classList.add('drag-over');
+    }
+
+    function dragLeaveHandler(ev) {
+      ev.preventDefault();
+      document.getElementById('drop-zone').classList.remove('drag-over');
+    }
+
+    function dropHandler(ev) {
+      ev.preventDefault();
+      document.getElementById('drop-zone').classList.remove('drag-over');
+
+      const items = ev.dataTransfer.items;
+
+      if (items) {
+        // Проверяем, есть ли папки
+        let hasDirectory = false;
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i].webkitGetAsEntry();
+          if (item && item.isDirectory) {
+            hasDirectory = true;
+            break;
+          }
+        }
+
+        if (hasDirectory) {
+          alert('Загрузка папок через drag\'n\'drop пока не поддерживается. Используйте кнопку "Загрузить файлы/папки".');
+          return;
+        }
+      }
+
+      const files = Array.from(ev.dataTransfer.files);
+      if (files.length === 0) return;
+
+      const formData = new FormData();
+      files.forEach(f => formData.append('files', f));
+
+      uploadFiles(formData);
+    }
 
     async function deleteItem(name, type) {
-      if (!confirm(`Удалить ${type === 'folder' ? 'папку' : 'файл'} "${name}"?`)) return;
+      const typeName = type === 'folder' ? 'папку' : 'файл';
+      const confirmText = type === 'folder'
+        ? `⚠️ ВНИМАНИЕ: Вы уверены, что хотите удалить папку "${name}" и всё её содержимое? Это действие нельзя отменить.`
+        : `Удалить файл "${name}"?`;
+
+      if (!confirm(confirmText)) return;
 
       try {
-        const res = await fetch('/delete-item', {
+        const res = await fetch(`/delete-item/<%= encodeURIComponent(currentPath) %>`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, type })

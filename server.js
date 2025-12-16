@@ -24,7 +24,7 @@ app.use('/teletext', express.static(path.join(__dirname, 'teletext')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// Middleware для безопасности
+// Security headers
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
@@ -32,7 +32,7 @@ app.use((req, res, next) => {
     res.setHeader(
         'Content-Security-Policy',
         "default-src 'self'; " +
-        "img-src 'self' data:; " +
+        "img-src 'self' ; " +
         "style-src 'self' 'unsafe-inline'; " +
         "script-src 'self' 'unsafe-inline' https://mc.yandex.ru; " +
         "font-src 'self';"
@@ -40,7 +40,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// Multer для загрузки
+// Multer для логотипов
 const upload = multer({
     storage: multer.diskStorage({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
@@ -55,7 +55,7 @@ const upload = multer({
     }
 });
 
-// Для загрузки файлов в менеджере
+// Multer для файлов — теперь принимает и папки (через веб)
 const uploadFiles = multer({
     storage: multer.diskStorage({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
@@ -78,17 +78,15 @@ const uploadFiles = multer({
     limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-// Вспомогательные функции
+// Валидация путей
 function isValidPath(p) {
     if (!p) return true;
     const allowedChars = /^[a-zA-Zа-яА-ЯёЁ0-9\s,. -_\/&()'\[\]{}@#~$%^*+=<>:;]+$/u;
-    if (!allowedChars.test(p)) {
-        return false;
-    }
+    if (!allowedChars.test(p)) return false;
     return !p.includes('..') && !p.startsWith('/') && !p.includes(':') && !p.includes('\\') && !p.includes('\0');
 }
 
-// 🖼️ Генерация PNG
+// Генерация превью
 async function generateThumbnail(htmlPath, pngPath) {
     let browser;
     try {
@@ -430,53 +428,83 @@ app.post('/logo-delete/*', (req, res) => {
     res.redirect(`/edit-card/${decodedPath}`);
 });
 
-// 📁 Файловый менеджер для teletext/
-app.get('/manager', (req, res) => {
-    const rootDir = path.join(__dirname, 'teletext');
-    if (!fs.existsSync(rootDir)) {
-        fs.mkdirSync(rootDir, { recursive: true });
+// 📁 Файловый менеджер с подпапками
+app.get('/manager/*', (req, res) => {
+    const requestedPath = req.params[0] || '';
+    let decodedPath = requestedPath;
+
+    if (!isValidPath(decodedPath)) {
+        return res.status(400).render('error', { message: 'Недопустимый путь' });
     }
 
-    const items = fs.readdirSync(rootDir);
+    const fullPath = path.join(__dirname, 'teletext', decodedPath);
+    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+        return res.status(404).render('error', { message: 'Папка не найдена' });
+    }
+
+    const items = fs.readdirSync(fullPath);
     const folders = [];
     const files = [];
 
     items.forEach(item => {
-        const fullPath = path.join(rootDir, item);
-        if (fs.statSync(fullPath).isDirectory()) {
-            const subItems = fs.readdirSync(fullPath);
+        const itemPath = path.join(fullPath, item);
+        if (fs.statSync(itemPath).isDirectory()) {
+            const subItems = fs.readdirSync(itemPath);
             const isEmpty = subItems.length === 0;
-            folders.push({ name: item, path: item, isEmpty });
+            folders.push({ name: item, path: decodedPath ? `${decodedPath}/${item}` : item, isEmpty });
         } else {
             files.push({
                 name: item,
-                size: fs.statSync(fullPath).size,
-                url: `/teletext/${encodeURIComponent(item)}`,
+                size: fs.statSync(itemPath).size,
+                url: `/teletext/${decodedPath ? encodeURIComponent(decodedPath) + '/' : ''}${encodeURIComponent(item)}`,
                 ext: path.extname(item).toLowerCase()
             });
         }
     });
 
+    const pathParts = decodedPath.split('/').filter(Boolean);
+    const breadcrumb = pathParts.map((part, i) => ({
+        name: part,
+        path: pathParts.slice(0, i + 1).join('/')
+    }));
+
     res.render('manager', {
         folders,
         files,
-        currentPath: '',
+        currentPath: decodedPath,
+        breadcrumb,
         disableCopy: true
     });
 });
 
+// 📁 Главная страница менеджера
+app.get('/manager', (req, res) => {
+    res.redirect('/manager/');
+});
+
 // ✅ Создать папку
-app.post('/create-folder', (req, res) => {
+app.post('/create-folder/*', (req, res) => {
+    const requestedPath = req.params[0] || '';
     const { name } = req.body;
+
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
         return res.status(400).json({ error: 'Имя папки обязательно' });
+    }
+
+    if (!isValidPath(requestedPath)) {
+        return res.status(400).json({ error: 'Недопустимый путь' });
     }
 
     const cleanName = name.trim()
         .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
         .replace(/\s+/g, '_');
 
-    const dirPath = path.join(__dirname, 'teletext', cleanName);
+    const fullPath = path.join(__dirname, 'teletext', requestedPath);
+    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+        return res.status(404).json({ error: 'Папка не найдена' });
+    }
+
+    const dirPath = path.join(fullPath, cleanName);
 
     if (fs.existsSync(dirPath)) {
         return res.status(400).json({ error: 'Папка уже существует' });
@@ -484,23 +512,28 @@ app.post('/create-folder', (req, res) => {
 
     try {
         fs.mkdirSync(dirPath, { recursive: true });
-        logAction('FOLDER_CREATED', `teletext/${cleanName}`);
+        logAction('FOLDER_CREATED', `teletext/${requestedPath ? requestedPath + '/' : ''}${cleanName}`);
         res.json({ success: true, name: cleanName });
     } catch (err) {
         res.status(500).json({ error: `Не удалось создать: ${err.message}` });
     }
 });
 
-// ✅ Удалить файл или пустую папку
-app.post('/delete-item', (req, res) => {
+// ✅ Удалить файл или папку (с содержимым)
+app.post('/delete-item/*', (req, res) => {
+    const requestedPath = req.params[0] || '';
     const { name, type } = req.body;
 
     if (!name || !type || !['file', 'folder'].includes(type)) {
         return res.status(400).json({ error: 'Некорректные данные' });
     }
 
+    if (!isValidPath(requestedPath)) {
+        return res.status(400).json({ error: 'Недопустимый путь' });
+    }
+
     const cleanName = path.basename(name);
-    const fullPath = path.join(__dirname, 'teletext', cleanName);
+    const fullPath = path.join(__dirname, 'teletext', requestedPath, cleanName);
 
     if (!fs.existsSync(fullPath)) {
         return res.status(404).json({ error: 'Объект не найден' });
@@ -509,14 +542,11 @@ app.post('/delete-item', (req, res) => {
     try {
         if (type === 'file') {
             fs.unlinkSync(fullPath);
-            logAction('FILE_DELETED', `teletext/${cleanName}`);
+            logAction('FILE_DELETED', `teletext/${requestedPath ? requestedPath + '/' : ''}${cleanName}`);
         } else if (type === 'folder') {
-            const items = fs.readdirSync(fullPath);
-            if (items.length > 0) {
-                return res.status(400).json({ error: 'Папка не пуста' });
-            }
-            fs.rmdirSync(fullPath);
-            logAction('FOLDER_DELETED', `teletext/${cleanName}`);
+            // Удаляем папку рекурсивно
+            fs.rmSync(fullPath, { recursive: true, force: true });
+            logAction('FOLDER_DELETED', `teletext/${requestedPath ? requestedPath + '/' : ''}${cleanName}`);
         }
         res.json({ success: true });
     } catch (err) {
@@ -524,11 +554,17 @@ app.post('/delete-item', (req, res) => {
     }
 });
 
-// ✅ Загрузка файлов в менеджере
-app.post('/upload/', uploadFiles.array('files', 10), (req, res) => {
-    const fullPath = path.join(__dirname, 'teletext');
+// ✅ Загрузка файлов (включая папки через drag’n’drop)
+app.post('/upload/*', uploadFiles.array('files', 50), async (req, res) => {
+    const requestedPath = req.params[0] || '';
+
+    if (!isValidPath(requestedPath)) {
+        return res.status(400).json({ error: 'Недопустимый путь' });
+    }
+
+    const fullPath = path.join(__dirname, 'teletext', requestedPath);
     if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
-        return res.status(404).json({ error: 'Папка teletext не найдена' });
+        return res.status(404).json({ error: 'Папка не найдена' });
     }
 
     const errors = [];
@@ -538,7 +574,7 @@ app.post('/upload/', uploadFiles.array('files', 10), (req, res) => {
         return res.status(400).json({ error: 'Нет файлов для загрузки' });
     }
 
-    req.files.forEach(file => {
+    for (const file of req.files) {
         try {
             let targetName = path.basename(file.originalname);
             if (targetName.includes('..') || targetName.startsWith('/')) {
@@ -554,11 +590,11 @@ app.post('/upload/', uploadFiles.array('files', 10), (req, res) => {
             fs.copyFileSync(file.path, targetPath);
             fs.unlinkSync(file.path);
             saved.push(targetName);
-            logAction('FILE_UPLOADED', `${targetName} → teletext/`);
+            logAction('FILE_UPLOADED', `${targetName} → teletext/${requestedPath ? requestedPath + '/' : ''}`);
         } catch (err) {
             errors.push(`${file.originalname}: ${err.message}`);
         }
-    });
+    }
 
     if (errors.length > 0) {
         return res.status(400).json({ error: 'Частичная ошибка загрузки', errors, saved });
@@ -572,7 +608,7 @@ app.use((req, res) => {
     res.status(404).render('error', { message: 'Страница не найдена' });
 });
 
-// ✅ Автоматическое переименование папок
+// Авто-переименование
 function autoRenameFoldersWithPattern(baseDir) {
     console.log('[AUTO-RENAME] Поиск папок с "&&.&&.&&&&", "XX.XX.&&&&", "XX.XX.&&&", "XX.XX.&&" во всём дереве...');
 
