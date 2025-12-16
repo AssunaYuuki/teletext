@@ -24,6 +24,22 @@ app.use('/teletext', express.static(path.join(__dirname, 'teletext')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Middleware для безопасности
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; " +
+        "img-src 'self' data:; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "script-src 'self' 'unsafe-inline' https://mc.yandex.ru; " +
+        "font-src 'self';"
+    );
+    next();
+});
+
 // Multer для загрузки
 const upload = multer({
     storage: multer.diskStorage({
@@ -39,15 +55,36 @@ const upload = multer({
     }
 });
 
+// Для загрузки файлов в менеджере
+const uploadFiles = multer({
+    storage: multer.diskStorage({
+        destination: (req, file, cb) => cb(null, os.tmpdir()),
+        filename: (req, file, cb) => {
+            const cleanName = file.originalname
+                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
+                .replace(/\s+/g, '_');
+            cb(null, `upload_${Date.now()}_${cleanName}`);
+        }
+    }),
+    fileFilter: (req, file, cb) => {
+        const allowed = ['.html', '.png', '.svg', '.txt'];
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (allowed.includes(ext)) {
+            cb(null, true);
+        } else {
+            cb(new Error(`Запрещённый тип файла: ${ext}. Разрешены: ${allowed.join(', ')}`));
+        }
+    },
+    limits: { fileSize: 5 * 1024 * 1024 }
+});
+
 // Вспомогательные функции
 function isValidPath(p) {
     if (!p) return true;
-    // Разрешаем: буквы (лат. и кириллица), цифры, пробел, запятую, точку, дефис, подчёркивание, слэш, амперсанд, скобки
     const allowedChars = /^[a-zA-Zа-яА-ЯёЁ0-9\s,. -_\/&()'\[\]{}@#~$%^*+=<>:;]+$/u;
     if (!allowedChars.test(p)) {
         return false;
     }
-    // Запрещаем опасные последовательности
     return !p.includes('..') && !p.startsWith('/') && !p.includes(':') && !p.includes('\\') && !p.includes('\0');
 }
 
@@ -119,7 +156,6 @@ app.get('/folder/*', async (req, res) => {
     const requestedPath = req.params[0] || '';
     let decodedPath = requestedPath;
 
-    // Просто используем raw path — без декодирования
     if (!isValidPath(decodedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
 
     const fullPath = path.join(__dirname, 'teletext', decodedPath);
@@ -146,7 +182,6 @@ app.get('/folder/*', async (req, res) => {
     const logoExistsPng = fs.existsSync(path.join(fullPath, 'logo.png'));
     const logoUrl = logoExists ? `/teletext/${decodedPath}/logo.svg` : logoExistsPng ? `/teletext/${decodedPath}/logo.png` : null;
 
-    // ✅ Чтение названий и описаний для подпапок
     const folderCards = {};
     folders.forEach(folder => {
         const folderPath = path.join(fullPath, folder);
@@ -163,7 +198,6 @@ app.get('/folder/*', async (req, res) => {
             }
         }
 
-        // ✅ Читаем description.txt
         let description = '';
         const descFile = path.join(folderPath, 'description.txt');
         if (fs.existsSync(descFile)) {
@@ -181,7 +215,7 @@ app.get('/folder/*', async (req, res) => {
                     ? `/teletext/${decodedPath ? decodedPath + '/' : ''}${folder}/logo.png`
                     : null,
             displayName,
-            description // ✅ Передаём описание
+            description
         };
     });
 
@@ -225,7 +259,7 @@ app.get('/page/*/:page', async (req, res) => {
     const pathParts = decodedPath.split('/').filter(Boolean);
     const breadcrumb = pathParts.map((part, i) => ({ name: part, path: pathParts.slice(0, i + 1).join('/') }));
     const pageList = pageNumbers.map(p => ({ page: p, hasThumb: fs.existsSync(path.join(fullPath, `${p}.png`)) }));
-    const basePath = `/teletext/${decodedPath}/`; // УБРАНО .replace(/ /g, '%20')
+    const basePath = `/teletext/${decodedPath}/`;
 
     const logoExists = fs.existsSync(path.join(fullPath, 'logo.svg'));
     const logoExistsPng = fs.existsSync(path.join(fullPath, 'logo.png'));
@@ -269,7 +303,6 @@ app.get('/edit-card/*', (req, res) => {
         }
     }
 
-    // ✅ Читаем description.txt
     let description = '';
     const descFile = path.join(fullPath, 'description.txt');
     if (fs.existsSync(descFile)) {
@@ -285,10 +318,10 @@ app.get('/edit-card/*', (req, res) => {
     const logoUrl = logoExists ? `/teletext/${decodedPath}/logo.svg` : logoExistsPng ? `/teletext/${decodedPath}/logo.png` : null;
 
     res.render('edit-card', {
-        archivePath: decodedPath, // Передаём decodedPath, а не raw
+        archivePath: decodedPath,
         folderName: path.basename(fullPath),
         currentTitle: title,
-        currentDescription: description, // ✅ Передаём описание
+        currentDescription: description,
         hasLogo: logoExists || logoExistsPng,
         logoUrl,
         disableCopy: true
@@ -312,13 +345,12 @@ app.post('/save-card/*', upload.single('logo'), (req, res) => {
     }
 
     const newTitle = (req.body.title || '').trim();
-    const newDescription = (req.body.description || '').trim(); // ✅ Новое поле
+    const newDescription = (req.body.description || '').trim();
     if (!newTitle) {
         logAction('CARD_SAVE_FAIL', 'Пустое название');
-        return res.redirect(`/edit-card/${decodedPath}`); // ← decodedPath
+        return res.redirect(`/edit-card/${decodedPath}`);
     }
 
-    // 1️⃣ Сохраняем название
     const titleFile = path.join(fullPath, 'title.txt');
     try {
         fs.writeFileSync(titleFile, newTitle, 'utf-8');
@@ -327,7 +359,6 @@ app.post('/save-card/*', upload.single('logo'), (req, res) => {
         logAction('TITLE_SAVE_ERROR', `${decodedPath}: ${err.message}`);
     }
 
-    // 2️⃣ Сохраняем описание
     if (newDescription) {
         const descFile = path.join(fullPath, 'description.txt');
         try {
@@ -337,7 +368,6 @@ app.post('/save-card/*', upload.single('logo'), (req, res) => {
             logAction('DESC_SAVE_ERROR', `${decodedPath}: ${err.message}`);
         }
     } else {
-        // Если описание пустое — удаляем файл, если он был
         const descFile = path.join(fullPath, 'description.txt');
         if (fs.existsSync(descFile)) {
             try {
@@ -349,7 +379,6 @@ app.post('/save-card/*', upload.single('logo'), (req, res) => {
         }
     }
 
-    // 3️⃣ Сохраняем логотип (если загружен)
     if (req.file) {
         const targetName = req.file.originalname.toLowerCase().endsWith('.svg') ? 'logo.svg' : 'logo.png';
         const targetPath = path.join(fullPath, targetName);
@@ -362,7 +391,7 @@ app.post('/save-card/*', upload.single('logo'), (req, res) => {
         }
     }
 
-    res.redirect(`/folder/${decodedPath}`); // ← decodedPath
+    res.redirect(`/folder/${decodedPath}`);
 });
 
 // 🗑 Удаление логотипа
@@ -398,7 +427,144 @@ app.post('/logo-delete/*', (req, res) => {
         logAction('LOGO_DELETED', `${deleted.join(', ')} из ${decodedPath}`);
     }
 
-    res.redirect(`/edit-card/${decodedPath}`); // ← decodedPath
+    res.redirect(`/edit-card/${decodedPath}`);
+});
+
+// 📁 Файловый менеджер для teletext/
+app.get('/manager', (req, res) => {
+    const rootDir = path.join(__dirname, 'teletext');
+    if (!fs.existsSync(rootDir)) {
+        fs.mkdirSync(rootDir, { recursive: true });
+    }
+
+    const items = fs.readdirSync(rootDir);
+    const folders = [];
+    const files = [];
+
+    items.forEach(item => {
+        const fullPath = path.join(rootDir, item);
+        if (fs.statSync(fullPath).isDirectory()) {
+            const subItems = fs.readdirSync(fullPath);
+            const isEmpty = subItems.length === 0;
+            folders.push({ name: item, path: item, isEmpty });
+        } else {
+            files.push({
+                name: item,
+                size: fs.statSync(fullPath).size,
+                url: `/teletext/${encodeURIComponent(item)}`,
+                ext: path.extname(item).toLowerCase()
+            });
+        }
+    });
+
+    res.render('manager', {
+        folders,
+        files,
+        currentPath: '',
+        disableCopy: true
+    });
+});
+
+// ✅ Создать папку
+app.post('/create-folder', (req, res) => {
+    const { name } = req.body;
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ error: 'Имя папки обязательно' });
+    }
+
+    const cleanName = name.trim()
+        .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
+        .replace(/\s+/g, '_');
+
+    const dirPath = path.join(__dirname, 'teletext', cleanName);
+
+    if (fs.existsSync(dirPath)) {
+        return res.status(400).json({ error: 'Папка уже существует' });
+    }
+
+    try {
+        fs.mkdirSync(dirPath, { recursive: true });
+        logAction('FOLDER_CREATED', `teletext/${cleanName}`);
+        res.json({ success: true, name: cleanName });
+    } catch (err) {
+        res.status(500).json({ error: `Не удалось создать: ${err.message}` });
+    }
+});
+
+// ✅ Удалить файл или пустую папку
+app.post('/delete-item', (req, res) => {
+    const { name, type } = req.body;
+
+    if (!name || !type || !['file', 'folder'].includes(type)) {
+        return res.status(400).json({ error: 'Некорректные данные' });
+    }
+
+    const cleanName = path.basename(name);
+    const fullPath = path.join(__dirname, 'teletext', cleanName);
+
+    if (!fs.existsSync(fullPath)) {
+        return res.status(404).json({ error: 'Объект не найден' });
+    }
+
+    try {
+        if (type === 'file') {
+            fs.unlinkSync(fullPath);
+            logAction('FILE_DELETED', `teletext/${cleanName}`);
+        } else if (type === 'folder') {
+            const items = fs.readdirSync(fullPath);
+            if (items.length > 0) {
+                return res.status(400).json({ error: 'Папка не пуста' });
+            }
+            fs.rmdirSync(fullPath);
+            logAction('FOLDER_DELETED', `teletext/${cleanName}`);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: `Ошибка: ${err.message}` });
+    }
+});
+
+// ✅ Загрузка файлов в менеджере
+app.post('/upload/', uploadFiles.array('files', 10), (req, res) => {
+    const fullPath = path.join(__dirname, 'teletext');
+    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+        return res.status(404).json({ error: 'Папка teletext не найдена' });
+    }
+
+    const errors = [];
+    const saved = [];
+
+    if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: 'Нет файлов для загрузки' });
+    }
+
+    req.files.forEach(file => {
+        try {
+            let targetName = path.basename(file.originalname);
+            if (targetName.includes('..') || targetName.startsWith('/')) {
+                throw new Error('Недопустимое имя файла');
+            }
+
+            targetName = targetName
+                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
+                .replace(/\s+/g, '_');
+
+            const targetPath = path.join(fullPath, targetName);
+
+            fs.copyFileSync(file.path, targetPath);
+            fs.unlinkSync(file.path);
+            saved.push(targetName);
+            logAction('FILE_UPLOADED', `${targetName} → teletext/`);
+        } catch (err) {
+            errors.push(`${file.originalname}: ${err.message}`);
+        }
+    });
+
+    if (errors.length > 0) {
+        return res.status(400).json({ error: 'Частичная ошибка загрузки', errors, saved });
+    }
+
+    res.json({ success: true, saved });
 });
 
 // 404
@@ -406,7 +572,7 @@ app.use((req, res) => {
     res.status(404).render('error', { message: 'Страница не найдена' });
 });
 
-// ✅ Автоматическое переименование папок с '&&.&&.&&&&', 'XX.XX.&&&&', 'XX.XX.&&&', 'XX.XX.&&'
+// ✅ Автоматическое переименование папок
 function autoRenameFoldersWithPattern(baseDir) {
     console.log('[AUTO-RENAME] Поиск папок с "&&.&&.&&&&", "XX.XX.&&&&", "XX.XX.&&&", "XX.XX.&&" во всём дереве...');
 
@@ -419,44 +585,33 @@ function autoRenameFoldersWithPattern(baseDir) {
             if (stats.isDirectory()) {
                 let newName = null;
 
-                // 1. Проверяем '&&.&&.&&&&'
                 if (item.includes('&&.&&.&&&&')) {
                     newName = item.replace('&&.&&.&&&&', 'xx.xx.xxxx');
-                }
-                // 2. Проверяем 'XX.XX.&&&&' (например, '12.09.&&&&')
-                else if (item.match(/.*\d+\.\d+\.&&&&$/)) {
+                } else if (item.match(/.*\d+\.\d+\.&&&&$/)) {
                     newName = item.replace('.&&&&', '.xxxx');
-                }
-                // 3. Проверяем 'XX.XX.&&&' (например, '10.11.&&&')
-                else if (item.match(/.*\d+\.\d+\.&&&$/)) {
+                } else if (item.match(/.*\d+\.\d+\.&&&$/)) {
                     newName = item.replace('.&&&', '.xxx');
-                }
-                // 4. Проверяем 'XX.XX.&&' (например, '10.11.&&')
-                else if (item.match(/.*\d+\.\d+\.&&$/)) {
+                } else if (item.match(/.*\d+\.\d+\.&&$/)) {
                     newName = item.replace('.&&', '.xx');
                 }
 
                 if (newName !== null) {
                     const newFullPath = path.join(dir, newName);
 
-                    // Проверяем, существует ли уже такая папка
                     if (fs.existsSync(newFullPath)) {
                         console.log(`[AUTO-RENAME] ⚠️ Папка уже существует: ${newFullPath}`);
                     } else {
                         try {
                             fs.renameSync(fullPath, newFullPath);
                             console.log(`[AUTO-RENAME] ✅ Переименовано: ${fullPath} → ${newFullPath}`);
+                            if (fs.existsSync(newFullPath)) {
+                                processDirectory(newFullPath);
+                            }
                         } catch (err) {
                             console.error(`[AUTO-RENAME] ❌ Ошибка при переименовании: ${err.message}`);
                         }
-
-                        // Рекурсивно обрабатываем подпапки
-                        if (fs.existsSync(newFullPath)) {
-                            processDirectory(newFullPath);
-                        }
                     }
                 } else {
-                    // Рекурсивно обрабатываем подпапки
                     processDirectory(fullPath);
                 }
             }
@@ -467,7 +622,6 @@ function autoRenameFoldersWithPattern(baseDir) {
     console.log('[AUTO-RENAME] Готово!');
 }
 
-// Запуск автоматического переименования при старте сервера
 const teletextDir = path.join(__dirname, 'teletext');
 if (fs.existsSync(teletextDir)) {
     autoRenameFoldersWithPattern(teletextDir);

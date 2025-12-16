@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📁 Менеджер архивов</title>
+  <link rel="stylesheet" href="/global.css">
+  <style>
+    .manager-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .controls {
+      background: var(--card-bg);
+      padding: 15px;
+      border-radius: 6px;
+      border: 1px solid var(--accent);
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .controls input, .controls button {
+      padding: 8px 12px;
+      background: var(--hover-bg);
+      border: 1px solid var(--accent);
+      color: var(--fg);
+      font-family: var(--font-mono);
+      border-radius: 4px;
+    }
+
+    .controls button {
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .controls button:hover {
+      background: var(--accent);
+      color: var(--bg);
+      box-shadow: var(--glow);
+    }
+
+    .items-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+    }
+
+    .item-card {
+      background: var(--card-bg);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .item-card:hover {
+      background: var(--hover-bg);
+      transform: translateY(-3px);
+      box-shadow: var(--glow);
+    }
+
+    .item-card.folder {
+      color: #ffcc00;
+    }
+
+    .item-card.file {
+      color: #a0d9a0;
+    }
+
+    .item-actions {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      display: flex;
+      gap: 4px;
+    }
+
+    .item-actions button {
+      background: rgba(0, 0, 0, 0.5);
+      border: none;
+      color: #ff6666;
+      cursor: pointer;
+      font-size: 0.8rem;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+
+    .item-actions button:hover {
+      background: #ff6666;
+      color: var(--bg);
+    }
+
+    .item-preview {
+      margin: 8px 0;
+      font-size: 1.2rem;
+    }
+
+    .item-name {
+      font-size: 0.85rem;
+      word-break: break-word;
+      margin-top: 5px;
+    }
+
+    .item-size {
+      font-size: 0.75rem;
+      opacity: 0.7;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>📁 Менеджер архивов</h1>
+    <p class="subtitle">teletext/ — управление файлами и папками</p>
+  </header>
+
+  <div class="manager-container">
+    <div class="controls">
+      <input type="text" id="folder-name" placeholder="Имя новой папки">
+      <button onclick="createFolder()">➕ Создать папку</button>
+      <input type="file" id="file-input" multiple accept=".html,.png,.svg,.txt">
+      <button onclick="document.getElementById('file-input').click()">⬆️ Загрузить файлы</button>
+    </div>
+
+    <div class="items-grid" id="items-list">
+      <% if (folders.length === 0 && files.length === 0) { %>
+        <div class="empty-state">
+          <p>📁 Папка <code>teletext/</code> пуста</p>
+          <p>Создайте папку или загрузите файлы</p>
+        </div>
+      <% } %>
+
+      <% folders.forEach(folder => { %>
+        <div class="item-card folder">
+          <div class="item-actions">
+            <button title="Удалить папку" onclick="deleteItem('<%= folder.name %>', 'folder')">✕</button>
+          </div>
+          <div class="item-preview">📂</div>
+          <div class="item-name"><%= folder.name %></div>
+          <div class="item-size"><%= folder.isEmpty ? 'пустая' : 'есть содержимое' %></div>
+        </div>
+      <% }) %>
+
+      <% files.forEach(file => { %>
+        <div class="item-card file">
+          <div class="item-actions">
+            <button title="Удалить файл" onclick="deleteItem('<%= file.name %>', 'file')">✕</button>
+          </div>
+          <div class="item-preview">
+            <% if (file.ext === '.png') { %>
+              <img src="<%= file.url %>" style="width:40px;height:40px;object-fit:cover;">
+            <% } else { %>
+              📄
+            <% } %>
+          </div>
+          <div class="item-name"><%= file.name %></div>
+          <div class="item-size"><%= Math.round(file.size / 1024) %> КБ</div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+
+  <footer>
+    <a href="/" class="btn">🏠 На главную</a>
+  </footer>
+
+  <script>
+    async function createFolder() {
+      const input = document.getElementById('folder-name');
+      const name = input.value.trim();
+      if (!name) return alert('Введите имя папки');
+
+      try {
+        const res = await fetch('/create-folder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (data.success) {
+          location.reload();
+        } else {
+          alert(data.error || 'Ошибка');
+        }
+      } catch (err) {
+        alert('Ошибка сети');
+      }
+    }
+
+    document.getElementById('file-input').onchange = async (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+
+      const formData = new FormData();
+      files.forEach(f => formData.append('files', f));
+
+      try {
+        const res = await fetch('/upload/', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success || data.saved) {
+          location.reload();
+        } else {
+          alert(data.error || 'Ошибка загрузки');
+        }
+      } catch (err) {
+        alert('Ошибка сети');
+      }
+    };
+
+    async function deleteItem(name, type) {
+      if (!confirm(`Удалить ${type === 'folder' ? 'папку' : 'файл'} "${name}"?`)) return;
+
+      try {
+        const res = await fetch('/delete-item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, type })
+        });
+        const data = await res.json();
+        if (data.success) {
+          location.reload();
+        } else {
+          alert(data.error || 'Ошибка');
+        }
+      } catch (err) {
+        alert('Ошибка сети');
+      }
+    }
+  </script>
+
+</body>
+</html>
