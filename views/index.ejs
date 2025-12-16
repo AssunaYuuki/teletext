@@ -96,99 +96,6 @@
         height: 11px;
       }
     }
-
-    /* Кнопки в футере */
-    .footer-buttons {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 12px;
-      padding: 15px 0;
-      margin-top: 20px;
-      background: var(--card-bg);
-      border-top: 1px solid var(--border);
-      box-shadow: 0 -2px 6px rgba(0,0,0,0.3);
-    }
-
-    .footer-button {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--card-bg);
-      border: 1px solid var(--accent);
-      border-radius: 6px;
-      padding: 8px 12px;
-      color: var(--fg);
-      text-decoration: none;
-      font-family: var(--font-mono);
-      font-size: 0.9rem;
-      transition: all 0.2s ease;
-      min-width: 80px;
-      gap: 6px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-
-    .footer-button:hover {
-      background: var(--hover-bg);
-      color: var(--accent);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 8px rgba(0,255,153,0.2);
-    }
-
-    .footer-button img {
-      width: 20px;
-      height: 20px;
-      object-fit: contain;
-      border-radius: 3px;
-    }
-
-    .footer-button small {
-      font-size: 0.7rem;
-      opacity: 0.7;
-      margin-left: 2px;
-    }
-
-    .footer-link {
-      color: var(--accent);
-      text-decoration: underline;
-      font-size: 0.85rem;
-      margin-top: 8px;
-      display: block;
-      text-align: center;
-    }
-
-    .footer-link:hover {
-      color: #00ffaa;
-    }
-
-    /* Анимация появления */
-    .footer-buttons {
-      opacity: 0;
-      transform: translateY(10px);
-      transition: opacity 0.4s ease, transform 0.4s ease;
-    }
-
-    .footer-buttons.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .btn {
-      padding: 8px 12px;
-      background: var(--button-bg);
-      color: var(--bg);
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-family: var(--font-mono);
-      font-size: 0.9rem;
-      transition: all 0.2s ease;
-    }
-
-    .btn:hover {
-      background: var(--button-hover);
-      transform: scale(1.02);
-    }
   </style>
 </head>
 <body>
@@ -233,62 +140,24 @@
     <% } %>
   </div>
 
-  <!-- Footer Buttons -->
-  <div class="footer-buttons" id="footer-buttons">
-    <a href="/about" class="footer-button">
-      <img src="https://cdn-icons-png.flaticon.com/512/1362/1362454.png" alt="ℹ️">
-      <span>О проекте</span>
-    </a>
-    <a href="https://notepad-plus-plus.org/" class="footer-button">
-      <img src="button_npp.png" alt="Notepad++">
-      <span>Нотепад</span>
-    </a>
-    <a href="__hakurei_reimu_kirisame_marisa_remilia_scarlet_flandre_scarlet_izayoi_sakuya_and_88_more_original_and_21_more_drawn_by_15_2118_7307_abua_aisora_aka_ringo_akaneya_akashio_loli_ace_akesaka_iku_ancient_chamber_aoblue_aozora_market_arata_toshihira_arcoi.jpg" class="footer-button">
-      <img src="touhou.jpg" alt="Touhou">
-      <span>Touhou</span>
-    </a>
-    <a href="https://www.pokemon.com/us/pokedex/sylveon" class="footer-button">
-      <img src="sylve.png" alt="Sylveon">
-      <span>Sylveon</span>
-    </a>
-    <a href="https://en.wikipedia.org/wiki/Large_language_model" class="footer-button">
-      <img src="human-made.gif" alt="LLM">
-      <span>LLM</span>
-    </a>
-    <a href="https://nekoweb.org/" class="footer-button">
-      <img src="https://nekoweb.org/assets/buttons/button5.gif" alt="NekoWeb">
-      <span>NekoWeb</span>
-    </a>
-    <a href="https://en.wikipedia.org/wiki/Popotan" class="footer-button">
-      <img src="caramelldansen.gif" alt="Popotan">
-      <span>Popotan</span>
-    </a>
-    <a href="https://en.wikipedia.org/wiki/Tetrahydrocannabinol" class="footer-button">
-      <img src="WEED2.png" alt="THC">
-      <span>THC</span>
-    </a>
-    <a href="https://www.cpcwiki.eu/imgs/e/ea/YMF288.pdf" class="footer-button">
-      <img src="https://galagen.net/ymf288.png" alt="YMF288">
-      <span>YMF288</span>
-    </a>
-  </div>
+<footer>
+  <a href="/about" class="btn">ℹ️ О проекте</a>
+  <small>By AssunaYuuki 2025 year</small>
+  <a href="https://notepad-plus-plus.org/"><img src="button_npp.png"></a>
+  <a href="__hakurei_reimu_kirisame_marisa_remilia_scarlet_flandre_scarlet_izayoi_sakuya_and_88_more_original_and_21_more_drawn_by_15_2118_7307_abua_aisora_aka_ringo_akaneya_akashio_loli_ace_akesaka_iku_ancient_chamber_aoblue_aozora_market_arata_toshihira_arcoi.jpg"><img src="touhou.jpg"></a>
+  <a href="https://www.pokemon.com/us/pokedex/sylveon"><img src="sylve.png"></a>
+  <a href="https://en.wikipedia.org/wiki/Large_language_model"><img src="human-made.gif"></a>
+  <a href="https://nekoweb.org/"><img src="https://nekoweb.org/assets/buttons/button5.gif"></a>
+  <a href="https://en.wikipedia.org/wiki/Popotan"><img src="caramelldansen.gif"></a>
+  <a href="https://en.wikipedia.org/wiki/Tetrahydrocannabinol"><img src="WEED2.png"></a>
+  <a href="https://www.cpcwiki.eu/imgs/e/ea/YMF288.pdf"><img src="ymf288.png"></a>
+</footer>
 
-  <footer style="text-align: center; padding: 10px; font-size: 0.8rem; opacity: 0.7;">
-    <small>By AssunaYuuki 2025 year</small>
-  </footer>
+</script>
 
-  <script>
-    // Анимация появления кнопок
-    document.addEventListener('DOMContentLoaded', () => {
-      const buttons = document.getElementById('footer-buttons');
-      setTimeout(() => {
-        buttons.classList.add('visible');
-      }, 500);
-    });
-  </script>
 
-  <!-- Yandex.Metrika counter -->
-  <script type="text/javascript">
+<!-- Yandex.Metrika counter -->
+<script type="text/javascript">
     (function(m,e,t,r,i,k,a){
         m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
         m[i].l=1*new Date();
@@ -297,9 +166,9 @@
     })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=105858659', 'ym');
 
     ym(105858659, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", accurateTrackBounce:true, trackLinks:true});
-  </script>
-  <noscript><div><img src="https://mc.yandex.ru/watch/105858659" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
-  <!-- /Yandex.Metrika counter -->
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/105858659" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<!-- /Yandex.Metrika counter -->
 
 </body>
 </html>
