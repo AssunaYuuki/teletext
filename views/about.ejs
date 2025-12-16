@@ -16,6 +16,7 @@
     .about-container h2 {
       color: var(--accent);
       margin-bottom: 15px;
+      text-shadow: 0 0 5px rgba(0, 255, 153, 0.4);
     }
 
     .about-container h3 {
@@ -40,6 +41,37 @@
     .about-container a:hover {
       text-decoration: underline;
     }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .feature-card {
+      background: var(--card-bg);
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      padding: 12px;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+
+    .feature-card span {
+      display: block;
+      font-size: 1.2rem;
+      margin-bottom: 6px;
+    }
+
+    .quote {
+      background: rgba(0, 255, 153, 0.1);
+      border-left: 3px solid var(--accent);
+      padding: 10px 15px;
+      margin: 15px 0;
+      font-style: italic;
+      color: #a0d9a0;
+    }
   </style>
 </head>
 <body>
@@ -52,7 +84,31 @@
       Проект создан для удобного и атмосферного просмотра ретро-материалов.
     </p>
 
-    <h3>Управление</h3>
+    <div class="quote">
+      "Телетекст — это не просто информация, это атмосфера эпохи."
+    </div>
+
+    <h3>🎯 Возможности</h3>
+    <div class="features-grid">
+      <div class="feature-card">
+        <span>📺</span>
+        Просмотр страниц
+      </div>
+      <div class="feature-card">
+        <span>📁</span>
+        Навигация по архивам
+      </div>
+      <div class="feature-card">
+        <span>🖼️</span>
+        Превью страниц
+      </div>
+      <div class="feature-card">
+        <span>✏️</span>
+        Редактирование карточек
+      </div>
+    </div>
+
+    <h3>⌨️ Управление</h3>
     <ul>
       <li><strong>←→</strong> — Переключение страниц</li>
       <li><strong>Home/End</strong> — Перейти к первой/последней странице</li>
@@ -60,22 +116,23 @@
       <li><strong>📁</strong> — Список страниц</li>
     </ul>
 
-    <h3>Файлы</h3>
+    <h3>📁 Файлы</h3>
     <p>
       Структура файлов:<br>
       <code>teletext/[канал]/[архив]/[номер].html</code><br>
       Например: <code>teletext/Belarus/100.html</code>
     </p>
 
+
+
     <h3>Автор</h3>
     <p>By AssunaYuuki 2025 year</p>
 
     <div style="margin-top: 30px;">
       <a href="/" class="btn">← На главную</a>
+      <a href="/manager" class="btn">📁 Менеджер архивов</a>
     </div>
   </main>
-
-
 
 </body>
 </html>
