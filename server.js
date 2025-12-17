@@ -57,6 +57,8 @@ const uploadFiles = multer({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
         filename: (req, file, cb) => {
             const cleanName = file.originalname
+                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
+                .replace(/\s+/g, '_');
             cb(null, `upload_${Date.now()}_${cleanName}`);
         }
     }),
@@ -70,11 +72,10 @@ const uploadFiles = multer({
         }
     },
     limits: {
-        fileSize: Infinity,
-        files: Infinity
+        fileSize: 20 * 1024 * 1024, // 20 МБ на файл
+        files: 200, // Максимум 200 файлов за раз
+        fieldSize: 50 * 1024 * 1024 // 50 МБ на поле
     }
-
-
 });
 
 // Валидация путей
