@@ -70,9 +70,8 @@ const uploadFiles = multer({
         }
     },
     limits: {
-        fileSize: 5 * 1024 * 1024, // 5 МБ на файл
-        files: 50, // Максимум 50 файлов за раз
-        fieldSize: 5 * 1024 * 1024 // 5 МБ на поле (если нужно)
+        fileSize: Infinity,
+        files: Infinity
     }
 
 
