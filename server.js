@@ -57,13 +57,11 @@ const uploadFiles = multer({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
         filename: (req, file, cb) => {
             const cleanName = file.originalname
-                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
-                .replace(/\s+/g, '_');
             cb(null, `upload_${Date.now()}_${cleanName}`);
         }
     }),
     fileFilter: (req, file, cb) => {
-        const allowed = ['.html', '.png', '.svg', '.txt', '.css', '.js', '.json', '.jpg', '.jpeg', '.gif', '.ttf', '.webp'];
+        const allowed = ['.html', '.png', '.svg', '.txt', '.css', '.js', '.json', '.jpg', '.jpeg', '.gif', '.webp'];
         const ext = path.extname(file.originalname).toLowerCase();
         if (allowed.includes(ext)) {
             cb(null, true);
@@ -71,7 +69,13 @@ const uploadFiles = multer({
             cb(new Error(`Запрещённый тип файла: ${ext}. Разрешены: ${allowed.join(', ')}`));
         }
     },
-    limits: { fileSize: 5 * 1024 * 1024 }
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5 МБ на файл
+        files: 50, // Максимум 50 файлов за раз
+        fieldSize: 5 * 1024 * 1024 // 5 МБ на поле (если нужно)
+    }
+
+
 });
 
 // Валидация путей
