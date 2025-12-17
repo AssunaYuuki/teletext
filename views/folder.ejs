@@ -261,12 +261,10 @@
               <span class="breadcrumb-separator">➤</span>
               <% if (i === breadcrumb.length - 1) { %>
                 <span class="breadcrumb-item current">
-                  <span class="breadcrumb-icon">📁</span>
                   <span class="breadcrumb-text"><%= crumb.name.replace(/%20/g, '_') %></span>
                 </span>
               <% } else { %>
                 <a href="/folder/<%= encodeURI(crumb.path) %>" class="breadcrumb-item">
-                  <span class="breadcrumb-icon">📁</span>
                   <span class="breadcrumb-text"><%= crumb.name.replace(/%20/g, '_') %></span>
                 </a>
               <% } %>
