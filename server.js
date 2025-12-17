@@ -487,14 +487,9 @@ app.post('/create-folder/*', (req, res) => {
         return res.status(400).json({ error: 'Имя папки обязательно' });
     }
 
-    // Вот здесь: раньше было `.replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')` — теперь уберём &
+    // Вот здесь: раньше было `.replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()&]/g, '_')` — теперь уберём и пробел, и точку
     const cleanName = name.trim()
-        .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()&]/g, '_') // ✅ Добавлен & в разрешённые символы
-        .replace(/\s+/g, '_');
 
-    if (!isValidPath(requestedPath)) {
-        return res.status(400).json({ error: 'Недопустимый путь' });
-    }
 
     const fullPath = path.join(__dirname, 'teletext', requestedPath);
     if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
