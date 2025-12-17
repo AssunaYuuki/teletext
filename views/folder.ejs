@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta http-equiv="Content-Security-Policy" content="
+<meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     connect-src 'self' https://mc.yandex.ru wss://mc.yandex.ru;
     script-src 'self' 'unsafe-inline' https://mc.yandex.ru;
@@ -426,7 +426,7 @@
     }
   </script>
 
-  <!-- Yandex.Metrika counter -->
+ <!-- Яндекс.Метрика -->
   <script type="text/javascript">
     (function(m,e,t,r,i,k,a){
       m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
@@ -446,18 +446,9 @@
       accurateTrackBounce:true,
       trackLinks:true
     });
-
-    app.use((req, res, next) => {
-      res.setHeader("Content-Security-Policy", `
-        default-src 'self';
-        connect-src 'self' https://mc.yandex.ru wss://mc.yandex.ru;
-        script-src 'self' 'unsafe-inline' https://mc.yandex.ru;
-        img-src 'self' https://mc.yandex.ru data:;
-        style-src 'self' 'unsafe-inline';
-      `.replace(/\n/g, ''));
-      next();
-    });
   </script>
-  <noscript><div><img src="https://mc.yandex.ru/watch/105890223" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+  <noscript>
+    <div><img src="https://mc.yandex.ru/watch/105890223" style="position:absolute; left:-9999px;" alt="" /></div>
+  </noscript>
 </body>
 </html>
