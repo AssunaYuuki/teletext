@@ -57,6 +57,8 @@ const uploadFiles = multer({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
         filename: (req, file, cb) => {
             const cleanName = file.originalname
+                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
+                .replace(/\s+/g, '_');
             cb(null, `upload_${Date.now()}_${cleanName}`);
         }
     }),
