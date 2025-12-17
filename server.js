@@ -32,7 +32,7 @@ app.use((req, res, next) => {
     res.setHeader(
         'Content-Security-Policy',
         "default-src 'self'; " +
-        "img-src 'self' ; " +
+        "img-src 'self' https://cdn.discordapp.com https://okgamer.ru/uploads/fotos/; " +
         "style-src 'self' 'unsafe-inline'; " +
         "script-src 'self' 'unsafe-inline' https://mc.yandex.ru; " +
         "font-src 'self';"
@@ -55,7 +55,7 @@ const upload = multer({
     }
 });
 
-// Multer для файлов — теперь принимает и папки (через веб)
+// Multer для файлов — теперь сохраняет структуру папок
 const uploadFiles = multer({
     storage: multer.diskStorage({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
@@ -67,7 +67,7 @@ const uploadFiles = multer({
         }
     }),
     fileFilter: (req, file, cb) => {
-        const allowed = ['.html', '.png', '.svg', '.css', '.ttf', '.txt' ];
+        const allowed = ['.html', '.png', '.svg', '.txt', '.css', '.js', '.json', '.jpg', '.jpeg', '.gif', '.ttf', '.webp'];
         const ext = path.extname(file.originalname).toLowerCase();
         if (allowed.includes(ext)) {
             cb(null, true);
@@ -496,6 +496,10 @@ app.post('/create-folder/*', (req, res) => {
         .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()&]/g, '_') // ✅ Добавлен & в разрешённые символы
         .replace(/\s+/g, '_');
 
+    if (!isValidPath(requestedPath)) {
+        return res.status(400).json({ error: 'Недопустимый путь' });
+    }
+
     const fullPath = path.join(__dirname, 'teletext', requestedPath);
     if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
         return res.status(404).json({ error: 'Папка не найдена' });
@@ -551,7 +555,7 @@ app.post('/delete-item/*', (req, res) => {
     }
 });
 
-// ✅ Загрузка файлов (включая папки через drag’n’drop) — альтернатива
+// ✅ Загрузка файлов с сохранением структуры папок
 app.post('/upload/*', uploadFiles.any(), async (req, res) => {
     const requestedPath = req.params[0] || '';
 
@@ -574,21 +578,26 @@ app.post('/upload/*', uploadFiles.any(), async (req, res) => {
 
     for (const file of req.files) {
         try {
-            let targetName = path.basename(file.originalname);
-            if (targetName.includes('..') || targetName.startsWith('/')) {
-                throw new Error('Недопустимое имя файла');
-            }
+            // Получаем относительный путь файла (если он был в подпапке)
+            const originalPath = file.originalname;
+            const relativeDir = path.dirname(originalPath);
+            const fileName = path.basename(originalPath);
 
-            targetName = targetName
-                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
-                .replace(/\s+/g, '_');
+            // Формируем целевую папку
+            const targetDir = path.join(fullPath, relativeDir);
+            const targetPath = path.join(targetDir, fileName);
 
-            const targetPath = path.join(fullPath, targetName);
+            // Создаём директорию, если её нет
+            fs.mkdirSync(targetDir, { recursive: true });
 
+            // Копируем файл
             fs.copyFileSync(file.path, targetPath);
             fs.unlinkSync(file.path);
-            saved.push(targetName);
-            logAction('FILE_UPLOADED', `${targetName} → teletext/${requestedPath ? requestedPath + '/' : ''}`);
+
+            // Логируем
+            const relativeToRoot = path.relative(path.join(__dirname, 'teletext'), targetPath);
+            saved.push(relativeToRoot);
+            logAction('FILE_UPLOADED', `${originalPath} → teletext/${relativeToRoot}`);
         } catch (err) {
             errors.push(`${file.originalname}: ${err.message}`);
         }
@@ -599,6 +608,89 @@ app.post('/upload/*', uploadFiles.any(), async (req, res) => {
     }
 
     res.json({ success: true, saved });
+});
+
+// ✅ Загрузка чата
+app.get('/chat/load/*', (req, res) => {
+    const requestedPath = req.params[0] || '';
+    let decodedPath = requestedPath;
+
+    if (!isValidPath(decodedPath)) {
+        return res.status(400).json({ error: 'Недопустимый путь' });
+    }
+
+    const fullPath = path.join(__dirname, 'teletext', decodedPath);
+    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+        return res.status(404).json([]);
+    }
+
+    const chatFile = path.join(fullPath, 'chat.json');
+    if (!fs.existsSync(chatFile)) {
+        return res.json([]);
+    }
+
+    try {
+        const content = fs.readFileSync(chatFile, 'utf-8');
+        const messages = JSON.parse(content);
+        res.json(Array.isArray(messages) ? messages : []);
+    } catch (err) {
+        console.error('Ошибка чтения чата:', err);
+        res.json([]);
+    }
+});
+
+// ✅ Отправка сообщения в чат
+app.post('/chat/send/*', (req, res) => {
+    const requestedPath = req.params[0] || '';
+    let decodedPath = requestedPath;
+
+    if (!isValidPath(decodedPath)) {
+        return res.status(400).json({ error: 'Недопустимый путь' });
+    }
+
+    const { text, author, avatar, timestamp } = req.body;
+    if (!text || !author || !timestamp) {
+        return res.status(400).json({ error: 'Недостающие данные' });
+    }
+
+    // Ограничение длины
+    if (text.length > 500) {
+        return res.status(400).json({ error: 'Сообщение слишком длинное' });
+    }
+    if (author.length > 30) {
+        return res.status(400).json({ error: 'Ник слишком длинный' });
+    }
+
+    const fullPath = path.join(__dirname, 'teletext', decodedPath);
+    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+        return res.status(404).json({ error: 'Папка не найдена' });
+    }
+
+    const chatFile = path.join(fullPath, 'chat.json');
+    let messages = [];
+
+    if (fs.existsSync(chatFile)) {
+        try {
+            const content = fs.readFileSync(chatFile, 'utf-8');
+            messages = JSON.parse(content);
+        } catch (err) {
+            messages = [];
+        }
+    }
+
+    messages.push({ text, author, avatar, timestamp });
+
+    // Ограничиваем 50 сообщений
+    if (messages.length > 50) {
+        messages = messages.slice(-50);
+    }
+
+    try {
+        fs.writeFileSync(chatFile, JSON.stringify(messages, null, 2), 'utf-8');
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Ошибка записи' });
+    }
 });
 
 // 404
