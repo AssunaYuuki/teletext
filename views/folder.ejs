@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title><%= folderName %> — Страницы</title>
+  <title><%= folderName.replace(/%20/g, '_') %> — Страницы</title>
   <link rel="stylesheet" href="/global.css"/>
   <style>
     .folder-container {
@@ -251,31 +251,41 @@
 <body>
 
   <header class="nav-bar">
-    <div class="breadcrumb">
-      <a href="/">🏠 Главная</a>
-      <% if (breadcrumb && breadcrumb.length > 0) { %>
-        <% breadcrumb.forEach((crumb, i) => { %>
-          <% if (i === breadcrumb.length - 1) { %>
-            <span> → <%= crumb.name %></span>
-          <% } else { %>
-            <a href="/folder/<%= crumb.path %>"> → <%= crumb.name %></a>
+        <div class="breadcrumb">
+          <a href="/" class="breadcrumb-item">
+            <span class="breadcrumb-icon">🏠</span>
+            <span class="breadcrumb-text">Главная</span>
+          </a>
+          <% if (breadcrumb && breadcrumb.length > 0) { %>
+            <% breadcrumb.forEach((crumb, i) => { %>
+              <span class="breadcrumb-separator">➤</span>
+              <% if (i === breadcrumb.length - 1) { %>
+                <span class="breadcrumb-item current">
+                  <span class="breadcrumb-icon">📁</span>
+                  <span class="breadcrumb-text"><%= crumb.name.replace(/%20/g, '_') %></span>
+                </span>
+              <% } else { %>
+                <a href="/folder/<%= encodeURI(crumb.path) %>" class="breadcrumb-item">
+                  <span class="breadcrumb-icon">📁</span>
+                  <span class="breadcrumb-text"><%= crumb.name.replace(/%20/g, '_') %></span>
+                </a>
+              <% } %>
+            <% }) %>
           <% } %>
-        <% }) %>
-      <% } %>
-    </div>
+        </div>
 
     <h2>
       <% if (hasLogo) { %>
         <img id="header-logo" src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип" style="height:32px;vertical-align:middle;margin-right:8px;" />
       <% } %>
-      <%= folderName %>
+      <%= folderName.replace(/%20/g, '_') %>
     </h2>
   </header>
 
   <div class="folder-container">
     <div class="content-wrapper">
       <div class="header">
-        <h1><%= folderName %></h1>
+        <h1><%= folderName.replace(/%20/g, '_') %></h1>
         <div class="breadcrumb">
           Подпапок: <%= folders.length %>, страниц: <%= pages.length %>
         </div>
@@ -296,7 +306,7 @@
                      data-logo="<%= logoUrl || '' %>"
                      data-folder="<%= folder %>"
                      data-path="<%= currentPath ? currentPath + '/' + folder : folder %>"
-                     onclick="updateHeaderLogo(this); window.location.href='/folder/<%= currentPath ? currentPath + '/' + folder : folder %>';"
+                     onclick="updateHeaderLogo(this); window.location.href='/folder/<%= encodeURI(currentPath ? currentPath + '/' + folder : folder) %>';"
                      onmouseenter="showEditButton(this)"
                      onmouseleave="hideEditButton(this)">
                   <% if (logoUrl) { %>
@@ -305,10 +315,10 @@
                     <span style="color:#ffcc00;font-size:1.2rem;">🌐</span>
                   <% } %>
 
-                  <span style="font-size:0.85rem; text-align:center; display:block; word-wrap:break-word; line-height:1.2; margin-top:6px;"><%= displayName %></span>
+                  <span style="font-size:0.85rem; text-align:center; display:block; word-wrap:break-word; line-height:1.2; margin-top:6px;"><%= displayName.replace(/%20/g, '_') %></span>
 
                   <% if (description && description.trim()) { %>
-                    <span class="info-icon" onclick="openModal('<%= displayName %>', '<%= description.replace(/'/g, "\\'").replace(/\n/g, "\\n") %>'); event.stopPropagation();">ℹ️</span>
+                    <span class="info-icon" onclick="openModal('<%= displayName.replace(/%20/g, '_') %>', '<%= description.replace(/'/g, "\\'").replace(/\n/g, "\\n") %>'); event.stopPropagation();">ℹ️</span>
                     <span class="tooltip">Описание</span>
                   <% } %>
                 </div>
@@ -323,7 +333,7 @@
           <h3>🖼️ Страницы</h3>
           <div class="grid">
             <% pages.forEach(item => { %>
-              <a href="/page/<%= currentPath %>/<%= item.page %>" class="thumb-item">
+              <a href="/page/<%= encodeURI(currentPath) %>/<%= item.page %>" class="thumb-item">
                 <% if (item.hasThumb) { %>
                   <img src="<%= `/teletext/${currentPath}/${item.page}.png` %>" alt="Стр. <%= item.page %>" />
                 <% } else { %>
@@ -343,13 +353,13 @@
       <% } %>
 
       <footer style="margin-top: 30px; text-align: center; font-size: 0.85rem; opacity: 0.7;">
-        <a href="https://notepad-plus-plus.org/"><img src="https://tele.assunayuuki.ru/button_npp.png" alt="Notepad++" /></a>
-        <a href="https://galagen.net/"><img src="https://tele.assunayuuki.ru/touhou.jpg" alt="Touhou" /></a>
-        <a href="https://en.wikipedia.org/wiki/Popotan"><img src="https://tele.assunayuuki.ru/caramelldansen.gif" alt="Caramelldansen" /></a>
-        <a href="https://archive.org/"><img src="https://tele.assunayuuki.ru/archive.gif" alt="Archive" /></a>
-        <a href="#"><img src="https://tele.assunayuuki.ru/ie.gif" alt="IE" /></a>
-        <a href="#"><img src="https://tele.assunayuuki.ru/built_with_amiga02.gif" alt="Amiga" /></a>
-        <a href="#"><img src="https://tele.assunayuuki.ru/c64ik.gif" alt="C64" /></a>
+        <a href="https://notepad-plus-plus.org/  "><img src="https://tele.assunayuuki.ru/button_npp.png  " alt="Notepad++" /></a>
+        <a href="https://galagen.net/  "><img src="https://tele.assunayuuki.ru/touhou.jpg  " alt="Touhou" /></a>
+        <a href="https://en.wikipedia.org/wiki/Popotan  "><img src="https://tele.assunayuuki.ru/caramelldansen.gif  " alt="Caramelldansen" /></a>
+        <a href="https://archive.org/  "><img src="https://tele.assunayuuki.ru/archive.gif  " alt="Archive" /></a>
+        <a href="#"><img src="https://tele.assunayuuki.ru/ie.gif  " alt="IE" /></a>
+        <a href="#"><img src="https://tele.assunayuuki.ru/built_with_amiga02.gif  " alt="Amiga" /></a>
+        <a href="#"><img src="https://tele.assunayuuki.ru/c64ik.gif  " alt="C64" /></a>
       </footer>
     </div>
   </div>
@@ -401,7 +411,7 @@
     }
 
     function openModal(title, description) {
-      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-title').textContent = title.replace(/%20/g, '_');
       document.getElementById('modal-body').textContent = description;
       document.getElementById('modal').style.display = 'flex';
     }

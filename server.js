@@ -21,8 +21,8 @@ app.set('views', path.join(__dirname, 'views'));
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/teletext', express.static(path.join(__dirname, 'teletext')));
-app.use(express.urlencoded({ extended: true, limit: '500mb' }));
-app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
 // Security headers
 app.use((req, res, next) => {
