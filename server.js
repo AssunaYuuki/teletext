@@ -31,7 +31,7 @@ app.use((req, res, next) => {
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader(
         'Content-Security-Policy',
-        "default-src 'self'; connect-src 'self' https://mc.yandex.ru; img-src 'self' https://cdn.discordapp.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://mc.yandex.ru; font-src 'self';"
+        "default-src 'self'; connect-src 'self' https://mc.yandex.ru wss://mc.yandex.ru; img-src 'self' https://cdn.discordapp.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://mc.yandex.ru; font-src 'self';"
     );
     next();
 });
