@@ -2,8 +2,14 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://mc.yandex.ru wss://mc.yandex.ru; script-src 'self' https://mc.yandex.ru; img-src 'self' https://mc.yandex.ru data:; style-src 'self' 'unsafe-inline';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    connect-src 'self' https://mc.yandex.ru wss://mc.yandex.ru;
+    script-src 'self' 'unsafe-inline' https://mc.yandex.ru;
+    img-src 'self' https://mc.yandex.ru data:;
+    style-src 'self' 'unsafe-inline';
+  ">
   <title><%= folderName %> — Страницы</title>
   <link rel="stylesheet" href="/global.css"/>
   <style>
