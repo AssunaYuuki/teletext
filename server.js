@@ -21,8 +21,8 @@ app.set('views', path.join(__dirname, 'views'));
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/teletext', express.static(path.join(__dirname, 'teletext')));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(express.urlencoded({ extended: true, limit: '500mb' }));
+app.use(express.json({ limit: '500mb' }));
 
 // Security headers
 app.use((req, res, next) => {
@@ -57,8 +57,6 @@ const uploadFiles = multer({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
         filename: (req, file, cb) => {
             const cleanName = file.originalname
-                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
-                .replace(/\s+/g, '_');
             cb(null, `upload_${Date.now()}_${cleanName}`);
         }
     }),
@@ -72,10 +70,11 @@ const uploadFiles = multer({
         }
     },
     limits: {
-        fileSize: 20 * 1024 * 1024, // 20 МБ на файл
-        files: 200, // Максимум 200 файлов за раз
-        fieldSize: 50 * 1024 * 1024 // 50 МБ на поле
+        fileSize: Infinity,
+        files: Infinity
     }
+
+
 });
 
 // Валидация путей
