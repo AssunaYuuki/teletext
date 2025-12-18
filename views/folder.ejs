@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= folderName.replace(/&nbsp;/g, '_') %> — Страницы</title>
-  <link rel="stylesheet" href="/global.css"/>
+  <link rel="stylesheet" href="/global.css">
   <style>
     .folder-container {
       display: flex;
@@ -197,7 +197,7 @@
       padding: 20px;
       max-width: 400px;
       width: 90%;
-      box-shadow: 0 0 20px rgba(0, 255, 153, 0.5);
+      box-shadow: 0 0 20px var(--glow);
       position: relative;
     }
 
@@ -218,6 +218,10 @@
       font-size: 1.5rem;
       font-weight: bold;
       cursor: pointer;
+    }
+
+    .close:hover {
+      text-shadow: 0 0 5px #ff6666;
     }
 
     .modal-body {
@@ -245,45 +249,36 @@
       background: var(--accent);
       color: var(--bg);
     }
-
   </style>
 </head>
 <body>
 
   <header class="nav-bar">
-        <div class="breadcrumb">
-          <a href="/" class="breadcrumb-item">
-            <span class="breadcrumb-icon">🏠</span>
-            <span class="breadcrumb-text">Главная</span>
-          </a>
-          <% if (breadcrumb && breadcrumb.length > 0) { %>
-            <% breadcrumb.forEach((crumb, i) => { %>
-              <span class="breadcrumb-separator">➤</span>
-              <% if (i === breadcrumb.length - 1) { %>
-                <span class="breadcrumb-item current">
-                  <span class="breadcrumb-text"><%= crumb.name.replace(/&nbsp;/g, '_') %></span>
-                </span>
-              <% } else { %>
-                <a href="/folder/<%= encodeURI(crumb.path) %>" class="breadcrumb-item">
-                  <span class="breadcrumb-text"><%= crumb.name.replace(/&nbsp;/g, '_') %></span>
-                </a>
-              <% } %>
-            <% }) %>
+    <div class="breadcrumb">
+      <a href="/">🏠</a>
+      <% if (breadcrumb && breadcrumb.length > 0) { %>
+        <% breadcrumb.forEach((crumb, i) => { %>
+          <% if (i === breadcrumb.length - 1) { %>
+            <span> → <%= crumb.name %></span>
+          <% } else { %>
+            <a href="/folder/<%= encodeURIComponent(crumb.path) %>"> → <%= crumb.name %></a>
           <% } %>
-        </div>
+        <% }) %>
+      <% } %>
+    </div>
 
     <h2>
       <% if (hasLogo) { %>
-        <img id="header-logo" src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип" style="height:32px;vertical-align:middle;margin-right:8px;" />
+        <img id="header-logo" src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип" style="height:32px;vertical-align:middle;margin-right:8px;">
       <% } %>
-      <%= folderName.replace(/&nbsp;/g, '_') %>
+      <%= folderName %>
     </h2>
   </header>
 
   <div class="folder-container">
     <div class="content-wrapper">
       <div class="header">
-        <h1><%= folderName.replace(/&nbsp;/g, '_') %></h1>
+        <h1><%= folderName %></h1>
         <div class="breadcrumb">
           Подпапок: <%= folders.length %>, страниц: <%= pages.length %>
         </div>
@@ -304,21 +299,24 @@
                      data-logo="<%= logoUrl || '' %>"
                      data-folder="<%= folder %>"
                      data-path="<%= currentPath ? currentPath + '/' + folder : folder %>"
-                     onclick="updateHeaderLogo(this); window.location.href='/folder/<%= encodeURI(currentPath ? currentPath + '/' + folder : folder) %>';"
+                     onclick="updateHeaderLogo(this); window.location.href='/folder/<%= encodeURIComponent(currentPath ? currentPath + '/' + folder : folder) %>';"
                      onmouseenter="showEditButton(this)"
-                     onmouseleave="hideEditButton(this)">
+                     onmouseleave="hideEditButton(this)"
+                     >
+
                   <% if (logoUrl) { %>
-                    <img src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип" style="height:32px; max-width: 100%; object-fit: contain; margin-top:8px;" />
+                    <img src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип" style="height:32px; max-width: 100%; object-fit: contain; margin-top:8px;">
                   <% } else { %>
                     <span style="color:#ffcc00;font-size:1.2rem;">🌐</span>
                   <% } %>
 
-                  <span style="font-size:0.85rem; text-align:center; display:block; word-wrap:break-word; line-height:1.2; margin-top:6px;"><%= displayName.replace(/&nbsp;/g, '_') %></span>
+                  <span style="font-size:0.85rem; text-align:center; display:block; word-wrap:break-word; line-height:1.2; margin-top:6px;"><%= displayName %></span>
 
                   <% if (description && description.trim()) { %>
-                    <span class="info-icon" onclick="openModal('<%= displayName.replace(/&nbsp;/g, '_') %>', '<%= description.replace(/'/g, "\\'").replace(/\n/g, "\\n") %>'); event.stopPropagation();">ℹ️</span>
+                    <span class="info-icon" onclick="openModal('<%= displayName.replace(/'/g, "\\'") %>', '<%= description.replace(/'/g, "\\'").replace(/\n/g, "\\n") %>'); event.stopPropagation();">ℹ️</span>
                     <span class="tooltip">Описание</span>
                   <% } %>
+
                 </div>
               </div>
             <% }) %>
@@ -331,9 +329,9 @@
           <h3>🖼️ Страницы</h3>
           <div class="grid">
             <% pages.forEach(item => { %>
-              <a href="/page/<%= encodeURI(currentPath) %>/<%= item.page %>" class="thumb-item">
+              <a href="/page/<%= encodeURIComponent(currentPath) %>/<%= item.page %>" class="thumb-item">
                 <% if (item.hasThumb) { %>
-                  <img src="<%= `/teletext/${currentPath}/${item.page}.png` %>" alt="Стр. <%= item.page %>" />
+                  <img src="<%= `/teletext/${currentPath}/${item.page}.png` %>" alt="Стр. <%= item.page %>">
                 <% } else { %>
                   <div style="height:80px; width:100%; background:#0a220a; display:flex; align-items:center; justify-content:center; color:#00ff88; font-size:1.1rem; font-weight:bold;">
                     <%= item.page %>
@@ -351,14 +349,7 @@
       <% } %>
 
       <footer style="margin-top: 30px; text-align: center; font-size: 0.85rem; opacity: 0.7;">
-        <a href="https://notepad-plus-plus.org/  "><img src="https://tele.assunayuuki.ru/button_npp.png  " alt="Notepad++" /></a>
-        <a href="https://galagen.net/__hakurei_reimu_kirisame_marisa_remilia_scarlet_flandre_scarlet_izayoi_sakuya_and_88_more_original_and_21_more_drawn_by_15_2118_7307_abua_aisora_aka_ringo_akaneya_akashio_loli_ace_akesaka_iku_ancient_chamber_aoblue_aozora_market_arata_toshihira_arcoi.jpg  "><img src="https://tele.assunayuuki.ru/touhou.jpg  " alt="Touhou" /></a>
-        <a href="https://en.wikipedia.org/wiki/Popotan  "><img src="https://tele.assunayuuki.ru/caramelldansen.gif  " alt="Caramelldansen" /></a>
-        <a href="https://archive.org/  "><img src="https://tele.assunayuuki.ru/archive.gif  " alt="Archive" /></a>
-        <a href="#"><img src="https://tele.assunayuuki.ru/ie.gif  " alt="IE" /></a>
-        <a href="#"><img src="https://tele.assunayuuki.ru/built_with_amiga02.gif  " alt="Amiga" /></a>
-        <a href="#"><img src="https://tele.assunayuuki.ru/c64ik.gif  " alt="C64" /></a>
-        <a href="#"><img src="https://tele.assunayuuki.ru/css3.gif  " alt="сss" /></a>
+        <small>Телетекст | Путь: <%= currentPath || 'корень' %></small>
       </footer>
     </div>
   </div>
@@ -426,7 +417,6 @@
       }
     }
   </script>
-
 
 </body>
 </html>
