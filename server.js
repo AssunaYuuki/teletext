@@ -32,7 +32,7 @@ app.use((req, res, next) => {
     res.setHeader(
         'Content-Security-Policy',
         "default-src 'self'; " +
-        "img-src 'self' https://cdn.discordapp.com https://okgamer.ru/uploads/fotos/; " +
+        "img-src 'self' https://cdn.discordapp.com https://tele.assunayuuki.ru/; " +
         "style-src 'self' 'unsafe-inline'; " +
         "script-src 'self' 'unsafe-inline' https://mc.yandex.ru; " +
         "font-src 'self';"
@@ -61,6 +61,8 @@ const uploadFiles = multer({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
         filename: (req, file, cb) => {
             const cleanName = file.originalname
+                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
+                .replace(/\s+/g, '_');
             cb(null, `upload_${Date.now()}_${cleanName}`);
         }
     }),
@@ -171,6 +173,13 @@ app.get('/folder/*', async (req, res) => {
         return { page, hasThumb };
     }).filter(p => !isNaN(p.page) && p.page >= 100 && p.page <= 999);
 
+    // ✅ Сортировка по дате модификации (новые — вверху)
+    const pagesWithMtime = pages.map(p => {
+        const filePath = path.join(fullPath, `${p.page}.html`);
+        const mtime = fs.statSync(filePath).mtime;
+        return { ...p, mtime };
+    }).sort((a, b) => b.mtime - a.mtime);
+
     const pathParts = decodedPath.split('/').filter(Boolean);
     const breadcrumb = pathParts.map((part, i) => ({ name: part, path: pathParts.slice(0, i + 1).join('/') }));
 
@@ -219,7 +228,7 @@ app.get('/folder/*', async (req, res) => {
         folderName: path.basename(fullPath) || 'Телетекст',
         currentPath: decodedPath,
         folders,
-        pages,
+        pages: pagesWithMtime, // ✅ Используем отсортированный массив
         breadcrumb,
         hasLogo: logoExists || logoExistsPng,
         logoUrl,
@@ -361,7 +370,7 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
         }
 
         try {
-            // Попытка переименования с повторами
+            // Попытка переименования с повторами (EPERM fix)
             const maxRetries = 3;
             let success = false;
             for (let i = 0; i < maxRetries; i++) {
@@ -557,6 +566,8 @@ app.post('/create-folder/*', (req, res) => {
     }
 
     const cleanName = name.trim()
+        .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
+        .replace(/\s+/g, '_');
 
     const fullPath = path.join(__dirname, 'teletext', requestedPath);
     if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
@@ -613,54 +624,6 @@ app.post('/delete-item/*', (req, res) => {
     }
 });
 
-// ✅ Загрузка файлов (включая папки через drag’n’drop)
-app.post('/upload/*', uploadFiles.any(), async (req, res) => {
-    const requestedPath = req.params[0] || '';
-
-    if (!isValidPath(requestedPath)) {
-        return res.status(400).json({ error: 'Недопустимый путь' });
-    }
-
-    const fullPath = path.join(__dirname, 'teletext', requestedPath);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
-        return res.status(404).json({ error: 'Папка не найдена' });
-    }
-
-    // req.files может быть undefined, если не переданы файлы
-    if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ error: 'Нет файлов для загрузки' });
-    }
-
-    const errors = [];
-    const saved = [];
-
-    for (const file of req.files) {
-        try {
-            let targetName = path.basename(file.originalname);
-            if (targetName.includes('..') || targetName.startsWith('/')) {
-                throw new Error('Недопустимое имя файла');
-            }
-
-            targetName = targetName
-
-            const targetPath = path.join(fullPath, targetName);
-
-            fs.copyFileSync(file.path, targetPath);
-            fs.unlinkSync(file.path);
-            saved.push(targetName);
-            logAction('FILE_UPLOADED', `${targetName} → teletext/${requestedPath ? requestedPath + '/' : ''}`);
-        } catch (err) {
-            errors.push(`${file.originalname}: ${err.message}`);
-        }
-    }
-
-    if (errors.length > 0) {
-        return res.status(400).json({ error: 'Частичная ошибка загрузки', errors, saved });
-    }
-
-    res.json({ success: true, saved });
-});
-
 // ✅ Переименовать файл или папку
 app.post('/rename-item/*', (req, res) => {
     const requestedPath = req.params[0] || '';
@@ -684,7 +647,7 @@ app.post('/rename-item/*', (req, res) => {
     }
 
     try {
-        // Попытка переименования с повторами
+        // Попытка переименования с повторами (EPERM fix)
         const maxRetries = 3;
         let success = false;
         for (let i = 0; i < maxRetries; i++) {
@@ -767,10 +730,64 @@ app.post('/move-item/*', (req, res) => {
     }
 });
 
+// ✅ Загрузка файлов (включая папки через drag’n’drop)
+app.post('/upload/*', uploadFiles.any(), async (req, res) => {
+    const requestedPath = req.params[0] || '';
+
+    if (!isValidPath(requestedPath)) {
+        return res.status(400).json({ error: 'Недопустимый путь' });
+    }
+
+    const fullPath = path.join(__dirname, 'teletext', requestedPath);
+    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+        return res.status(404).json({ error: 'Папка не найдена' });
+    }
+
+    // req.files может быть undefined, если не переданы файлы
+    if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: 'Нет файлов для загрузки' });
+    }
+
+    const errors = [];
+    const saved = [];
+
+    for (const file of req.files) {
+        try {
+            let targetName = path.basename(file.originalname);
+            if (targetName.includes('..') || targetName.startsWith('/')) {
+                throw new Error('Недопустимое имя файла');
+            }
+
+            targetName = targetName
+                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
+                .replace(/\s+/g, '_');
+
+            const targetPath = path.join(fullPath, targetName);
+
+            fs.copyFileSync(file.path, targetPath);
+            fs.unlinkSync(file.path);
+            saved.push(targetName);
+            logAction('FILE_UPLOADED', `${targetName} → teletext/${requestedPath ? requestedPath + '/' : ''}`);
+        } catch (err) {
+            errors.push(`${file.originalname}: ${err.message}`);
+        }
+    }
+
+    if (errors.length > 0) {
+        return res.status(400).json({ error: 'Частичная ошибка загрузки', errors, saved });
+    }
+
+    res.json({ success: true, saved });
+});
+
+
+
 // 404
 app.use((req, res) => {
     res.status(404).render('error', { message: 'Страница не найдена' });
 });
+
+
 
 app.listen(port, () => {
     logAction('SERVER_START', `http://localhost:${port}`);
