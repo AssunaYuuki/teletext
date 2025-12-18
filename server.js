@@ -243,13 +243,20 @@ app.get('/folder/*', async (req, res) => {
         };
     });
 
-    // --- Шаг 4: Рендер шаблона ---
+    // ✅ Инициализируем список страниц
+    const pages = htmlFiles.map(file => {
+        const pageStr = file.replace('.html', '');
+        const page = parseInt(pageStr, 10);
+        const hasThumb = fs.existsSync(path.join(fullPath, `${pageStr}.png`));
+        return { page, hasThumb };
+    }).filter(p => !isNaN(p.page) && p.page >= 100 && p.page <= 999);
+
     res.render('folder', {
         folderName: path.basename(fullPath) || 'Телетекст',
         currentPath: decodedPath,
         folders,
         groupedFolders, // ✅ Передаём сгруппированные подпапки
-        htmlFiles,      // ✅ Передаём список html-файлов
+        pages,        // ✅ Теперь передаём список страниц
         breadcrumb,
         hasLogo: logoExists || logoExistsPng,
         logoUrl,

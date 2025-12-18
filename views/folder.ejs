@@ -318,7 +318,6 @@
       margin-top: 6px;
     }
 
-    /* Кнопки редактирования и информации для годовых карточек */
     .year-edit-btn-wrapper {
       position: absolute;
       top: 4px;
@@ -415,7 +414,7 @@
       <div class="header">
         <h1><%= folderName %></h1>
         <div class="breadcrumb">
-          Подпапок: <%= folders.length %>, страниц: <%= htmlFiles.length %>
+          Подпапок: <%= folders.length %>, страниц: <%= pages.length %>
         </div>
       </div>
 
@@ -468,7 +467,7 @@
           <% }) %>
         </section>
       <% } else if (folders.length > 0) { %>
-        <!-- ✅ Если нет группировки (все папки без дат) — показываем как обычно -->
+        <!-- ✅ Если нет группировки — показываем обычные карточки -->
         <section>
           <h3>📁 Подпапки</h3>
           <div class="grid">
@@ -508,25 +507,21 @@
         </section>
       <% } %>
 
-      <% if (htmlFiles.length > 0) { %>
+      <!-- ✅ Страницы -->
+      <% if (pages.length > 0) { %>
         <section class="thumbs-grid">
           <h3>🖼️ Страницы</h3>
           <div class="grid">
-            <% htmlFiles.forEach(file => {
-                const pageStr = file.replace('.html', '');
-                const page = parseInt(pageStr, 10);
-                if (isNaN(page) || page < 100 || page > 999) return;
-                const hasThumb = fs.existsSync(path.join(fullPath, `${pageStr}.png`));
-            %>
-              <a href="/page/<%= encodeURIComponent(currentPath) %>/<%= page %>" class="thumb-item">
-                <% if (hasThumb) { %>
-                  <img src="<%= `/teletext/${currentPath}/${page}.png` %>" alt="Стр. <%= page %>">
+            <% pages.forEach(item => { %>
+              <a href="/page/<%= encodeURIComponent(currentPath) %>/<%= item.page %>" class="thumb-item">
+                <% if (item.hasThumb) { %>
+                  <img src="<%= `/teletext/${currentPath}/${item.page}.png` %>" alt="Стр. <%= item.page %>">
                 <% } else { %>
                   <div style="height:80px; width:100%; background:#0a220a; display:flex; align-items:center; justify-content:center; color:#00ff88; font-size:1.1rem; font-weight:bold;">
-                    <%= page %>
+                    <%= item.page %>
                   </div>
                 <% } %>
-                <span style="margin-top:4px; font-size:0.85rem;"><%= page %></span>
+                <span style="margin-top:4px; font-size:0.85rem;"><%= item.page %></span>
               </a>
             <% }) %>
           </div>
