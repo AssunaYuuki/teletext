@@ -145,6 +145,15 @@
       opacity: 0.7;
     }
 
+#drop-zone.drag-over {
+  background: rgba(0, 255, 153, 0.1);
+  border-color: #00ffaa;
+}
+
+#drop-zone.drag-over div {
+  background: rgba(0, 255, 153, 0.2);
+}
+
     /* Модальное окно */
     .modal {
       display: none;
@@ -281,13 +290,16 @@
       <button onclick="pasteItem()" id="paste-btn" style="display:none; background: var(--card-bg); border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">📋 Вставить</button>
     </div>
 
+    <!-- Блок перетаскивания -->
     <div id="drop-zone" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);" ondragleave="dragLeaveHandler(event);">
-      <p>📁 Перетащите файлы или папки сюда для загрузки</p>
-    </div>
-
-    <div id="progress-container">
-      <div id="progress-bar"></div>
-      <div id="progress-text">Загрузка...</div>
+      <div style="display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--hover-bg); border: 2px dashed var(--accent); border-radius: 6px; cursor: pointer;">
+        <span style="font-size: 1.2rem;">📁</span>
+        <span style="color: var(--accent); font-size: 0.9rem;">Перетащите файлы или папки сюда для загрузки</span>
+      </div>
+      <div id="progress-container" style="margin-top: 10px; display: none;">
+        <div id="progress-bar" style="width: 0%; height: 4px; background: var(--accent); border-radius: 2px;"></div>
+        <div id="progress-text" style="font-size: 0.85rem; color: var(--accent); margin-top: 5px;">Загрузка...</div>
+      </div>
     </div>
 
     <div class="items-grid" id="items-list">
