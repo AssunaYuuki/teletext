@@ -186,13 +186,13 @@
             <a
               href="/page/<%= currentPath %>/<%= item.page %>"
               class="thumb-item <%= item.page === pageNumber ? 'active' : '' %>">
-              <% if (item.hasThumb) { %>
-                <img src="<%= `/teletext/${currentPath}/${item.page}.png` %>" alt="Стр. <%= item.page %>">
-              <% } else { %>
-                <div style="height:100px; background:var(--hover-bg); display:flex; align-items:center; justify-content:center; color:var(--accent); font-size:0.9rem;">
-                  <%= item.page %>
-                </div>
-              <% } %>
+               <% if (item.hasThumb) { %>
+                                <img src="<%= `/teletext/${currentPath}/${item.page}.png` %>?t=<%= Date.now() %>" alt="Стр. <%= item.page %>" loading="lazy" style="width:100%; height:80px; object-fit:cover; border-radius:3px;">
+                              <% } else { %>
+                                <div style="height:80px; width:100%; background:#0a220a; display:flex; align-items:center; justify-content:center; color:#00ff88; font-size:1.1rem; font-weight:bold;">
+                                  <%= item.page %>
+                                </div>
+                              <% } %>
               <span><%= item.page %></span>
             </a>
           <% }) %>
