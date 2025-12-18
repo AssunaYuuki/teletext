@@ -323,7 +323,7 @@
         </div>
 
         <div class="form-group">
-          <label>Загрузить новый (SVG/PNG/JPG)</label>
+          <label for="logo-upload">Загрузить новый (SVG/PNG/JPG)</label>
           <input type="file" name="logo" accept=".svg,.png,.jpg,.jpeg" id="logo-upload">
           <small>Оставьте пустым — логотип не изменится</small>
         </div>
@@ -334,7 +334,7 @@
         <div class="form-group">
           <label for="title">Текст под логотипом</label>
           <input type="text" id="title" name="title" value="<%= currentTitle %>" required maxlength="50" placeholder="Введите название">
-          <small>Сохраняется в <code>title.txt</code></small>
+          <small>Сохраняется в <code>title.txt</code>. Имя папки будет автоматически изменено на это название.</small>
         </div>
       </div>
 
@@ -416,8 +416,26 @@
             };
             reader.readAsDataURL(logoFile);
           }
+
+          // Перенаправляем на новую папку (если название изменилось)
+          const currentFolderName = '<%= folderName %>';
+          if (newTitle && newTitle !== currentFolderName) {
+            const currentPath = '<%= archivePath %>';
+            const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+            const newPath = parentPath ? `${parentPath}/${encodeURIComponent(newTitle)}` : encodeURIComponent(newTitle);
+            // Задержка перед редиректом, чтобы пользователь увидел уведомление
+            setTimeout(() => {
+              window.location.href = `/folder/${newPath}`;
+            }, 2000);
+          } else {
+            // Если имя не менялось, просто обновляем страницу редактирования
+            setTimeout(() => {
+              window.location.reload();
+            }, 2000);
+          }
         } else {
-          alert('Ошибка при сохранении: ' + response.status);
+          const errorText = await response.text();
+          alert('Ошибка при сохранении: ' + response.status + ' - ' + errorText);
         }
       } catch (err) {
         alert('Ошибка сети: ' + err.message);
