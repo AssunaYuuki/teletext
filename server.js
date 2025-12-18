@@ -89,7 +89,7 @@ function isValidPath(p) {
     return !p.includes('..') && !p.startsWith('/') && !p.includes(':') && !p.includes('\\') && !p.includes('\0');
 }
 
-// Генерация превью
+// ✅ Генерация превью с масштабированием до 200x200
 async function generateThumbnail(htmlPath, pngPath) {
     let browser;
     try {
@@ -102,20 +102,24 @@ async function generateThumbnail(htmlPath, pngPath) {
                 '--disable-gpu',
                 '--disable-web-security'
             ],
-            defaultViewport: { width: 800, height: 600 }
+            defaultViewport: { width: 200, height: 200 }
         });
         const page = await browser.newPage();
         await page.goto(`file://${htmlPath}`, { waitUntil: 'networkidle2', timeout: 15000 });
+
+        // Сначала делаем скриншот в 800x600
         await page.screenshot({ path: pngPath, type: 'png', fullPage: true });
 
-        // ✅ Оптимизация PNG (если sharp установлен)
-        // try {
-        //   const optimizedBuffer = await sharp(pngPath).png({ quality: 80 }).toBuffer();
-        //   fs.writeFileSync(pngPath, optimizedBuffer);
-        //   logAction('PNG_OPTIMIZED', pngPath);
-        // } catch (optErr) {
-        //   logAction('PNG_OPTIMIZE_ERROR', `${pngPath}: ${optErr.message}`);
-        // }
+        // ✅ Масштабируем до 200x200 через sharp
+        const sharp = require('sharp');
+        const buffer = fs.readFileSync(pngPath);
+        const resizedBuffer = await sharp(buffer)
+            .resize(200, 200, { fit: 'cover', position: 'center' }) // Обрезаем по центру
+            .toBuffer();
+        fs.writeFileSync(pngPath, resizedBuffer);
+
+        logAction('THUMBNAIL_GENERATED_200x200', pngPath);
+
     } catch (err) {
         throw err;
     } finally {
