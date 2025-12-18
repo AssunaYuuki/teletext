@@ -165,57 +165,39 @@ app.get('/folder/*', async (req, res) => {
     const folders = items.filter(item => fs.statSync(path.join(fullPath, item)).isDirectory());
     const htmlFiles = items.filter(item => item.endsWith('.html'));
 
-    // ✅ Определяем, является ли текущая папка "каналом" (содержит ',' или '&')
-    const isChannel = decodedPath.includes(',') || decodedPath.includes('&');
+    // ✅ Группировка подпапок по годам (извлекаем из имени папки)
+    const foldersByYear = {};
+    folders.forEach(folder => {
+        let year = 0; // Если год не найден — будет 0
 
-    let groupedFolders = {};
-    let groupedPages = {};
-
-    if (isChannel) {
-        // ✅ Группировка подпапок по годам (для каналов)
-        const foldersByYear = {};
-        folders.forEach(folder => {
-            let year = 0; // Если год не найден — будет 0
-
-            // Ищем 4-значный или 2-значный год в конце имени папки (например, "1KANAL 01.12.2006" -> 2006)
-            const dateMatch = folder.match(/(\d{2}|\d{4})$/);
-            if (dateMatch) {
-                const yearPart = dateMatch[1];
-                if (yearPart.length === 4) {
-                    year = parseInt(yearPart, 10); // 1995, 2003...
-                } else if (yearPart.length === 2) {
-                    const num = parseInt(yearPart, 10);
-                    // Превращаем 95 в 1995, 03 в 2003
-                    year = num > 25 ? 1900 + num : 2000 + num; // Условно: 26-99 -> 19xx, 00-25 -> 20xx
-                }
+        // Ищем 4-значный или 2-значный год в конце имени папки (например, "1KANAL 01.12.2006" -> 2006, "Channel 95" -> 1995)
+        const dateMatch = folder.match(/(\d{2}|\d{4})$/);
+        if (dateMatch) {
+            const yearPart = dateMatch[1];
+            if (yearPart.length === 4) {
+                year = parseInt(yearPart, 10); // 1995, 2003...
+            } else if (yearPart.length === 2) {
+                const num = parseInt(yearPart, 10);
+                // Превращаем 95 в 1995, 03 в 2003
+                year = num > 25 ? 1900 + num : 2000 + num; // Условно: 26-99 -> 19xx, 00-25 -> 20xx
             }
-
-            if (!foldersByYear[year]) {
-                foldersByYear[year] = [];
-            }
-            foldersByYear[year].push(folder);
-        });
-
-        // Сортируем годы (новые — вверху) и папки внутри года
-        const sortedYears = Object.keys(foldersByYear)
-            .map(y => parseInt(y, 10))
-            .sort((a, b) => b - a); // От новых к старым
-
-        groupedFolders = {};
-        sortedYears.forEach(year => {
-            if (year !== 0) { // Не добавляем "Без года" в список лет
-                groupedFolders[year] = foldersByYear[year].sort(); // По алфавиту
-            }
-        });
-
-        // ✅ Все папки без года (год == 0) — в одну секцию "Без года"
-        if (foldersByYear[0] && foldersByYear[0].length > 0) {
-            groupedFolders['0'] = foldersByYear[0].sort(); // Добавляем "Без года" как отдельную секцию
         }
-    } else {
-        // ✅ Для стран — просто используем обычные подпапки
-        groupedFolders = {}; // Не используется
-    }
+
+        if (!foldersByYear[year]) {
+            foldersByYear[year] = [];
+        }
+        foldersByYear[year].push(folder);
+    });
+
+    // Сортируем годы (новые — вверху) и папки внутри года
+    const sortedYears = Object.keys(foldersByYear)
+        .map(y => parseInt(y, 10))
+        .sort((a, b) => b - a); // От новых к старым
+
+    const groupedFolders = {};
+    sortedYears.forEach(year => {
+        groupedFolders[year] = foldersByYear[year].sort(); // По алфавиту
+    });
 
     const pathParts = decodedPath.split('/').filter(Boolean);
     const breadcrumb = pathParts.map((part, i) => ({ name: part, path: pathParts.slice(0, i + 1).join('/') }));
@@ -268,7 +250,6 @@ app.get('/folder/*', async (req, res) => {
         folders,
         groupedFolders, // ✅ Передаём сгруппированные подпапки
         htmlFiles,      // ✅ Передаём список html-файлов
-        isChannel,     // ✅ Передаём флаг, что это канал
         breadcrumb,
         hasLogo: logoExists || logoExistsPng,
         logoUrl,
