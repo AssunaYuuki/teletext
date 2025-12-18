@@ -61,8 +61,6 @@ const uploadFiles = multer({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
         filename: (req, file, cb) => {
             const cleanName = file.originalname
-                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
-                .replace(/\s+/g, '_');
             cb(null, `upload_${Date.now()}_${cleanName}`);
         }
     }),
@@ -559,8 +557,6 @@ app.post('/create-folder/*', (req, res) => {
     }
 
     const cleanName = name.trim()
-        .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
-        .replace(/\s+/g, '_');
 
     const fullPath = path.join(__dirname, 'teletext', requestedPath);
     if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
@@ -646,8 +642,6 @@ app.post('/upload/*', uploadFiles.any(), async (req, res) => {
             }
 
             targetName = targetName
-                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
-                .replace(/\s+/g, '_');
 
             const targetPath = path.join(fullPath, targetName);
 

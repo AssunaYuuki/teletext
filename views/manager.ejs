@@ -278,7 +278,7 @@
       <button onclick="createFolder()">➕ Создать папку</button>
       <input type="file" id="file-input" multiple directory webkitdirectory accept=".html,.png,.svg,.txt,.css,.js,.json,.jpg,.jpeg,.gif,.webp" />
       <button onclick="document.getElementById('file-input').click()">⬆️ Загрузить файлы/папки</button>
-      <button onclick="pasteItem()" id="paste-btn" style="display:none;">📋 Вставить</button>
+      <button onclick="pasteItem()" id="paste-btn" style="display:none; background: var(--card-bg); border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">📋 Вставить</button>
     </div>
 
     <div id="drop-zone" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);" ondragleave="dragLeaveHandler(event);">
@@ -635,6 +635,66 @@
         alert('Ошибка сети');
       }
     }
+
+// Проверяем наличие вырезанного элемента в localStorage при загрузке
+document.addEventListener('DOMContentLoaded', () => {
+    const savedCutItem = localStorage.getItem('cutItemData');
+    if (savedCutItem) {
+        document.getElementById('paste-btn').style.display = 'inline-block';
+    }
+});
+
+// Функция для сохранения данных вырезанного элемента в localStorage
+function cutItem(name, type) {
+    const cutItemData = {
+        name: name,
+        type: type,
+        sourcePath: currentPath
+    };
+    localStorage.setItem('cutItemData', JSON.stringify(cutItemData));
+    alert(`✅ Элемент "${name}" вырезан. Перейдите в нужную папку и нажмите "Вставить".`);
+    document.getElementById('paste-btn').style.display = 'inline-block';
+}
+
+// Функция для вставки элемента
+async function pasteItem() {
+    const savedCutItemStr = localStorage.getItem('cutItemData');
+    if (!savedCutItemStr) {
+        alert('Нет вырезанного элемента!');
+        return;
+    }
+
+    try {
+        const cutItemData = JSON.parse(savedCutItemStr);
+        const itemName = cutItemData.name;
+        const itemType = cutItemData.type;
+        const sourcePath = cutItemData.sourcePath;
+
+        // Проверяем, не пытаемся ли вставить в ту же папку
+        if (sourcePath === currentPath) {
+            alert('Нельзя вставить элемент в ту же папку, откуда он был вырезан.');
+            return;
+        }
+
+        const res = await fetch('/move-item/' + encodeURIComponent(sourcePath), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemName: itemName, targetPath: currentPath, type: itemType })
+        });
+
+        if (res.ok) {
+            alert('✅ Элемент перемещён!');
+            localStorage.removeItem('cutItemData'); // Очищаем буфер
+            document.getElementById('paste-btn').style.display = 'none';
+            location.reload();
+        } else {
+            const data = await res.json();
+            alert(data.error || 'Ошибка перемещения');
+        }
+    } catch (err) {
+        alert('Ошибка сети');
+    }
+}
   </script>
 
 </body>
