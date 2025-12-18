@@ -61,6 +61,8 @@ const uploadFiles = multer({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
         filename: (req, file, cb) => {
             const cleanName = file.originalname
+                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
+                .replace(/\s+/g, '_');
             cb(null, `upload_${Date.now()}_${cleanName}`);
         }
     }),
@@ -557,6 +559,8 @@ app.post('/create-folder/*', (req, res) => {
     }
 
     const cleanName = name.trim()
+        .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
+        .replace(/\s+/g, '_');
 
     const fullPath = path.join(__dirname, 'teletext', requestedPath);
     if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
@@ -642,6 +646,8 @@ app.post('/upload/*', uploadFiles.any(), async (req, res) => {
             }
 
             targetName = targetName
+                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
+                .replace(/\s+/g, '_');
 
             const targetPath = path.join(fullPath, targetName);
 
@@ -659,42 +665,6 @@ app.post('/upload/*', uploadFiles.any(), async (req, res) => {
     }
 
     res.json({ success: true, saved });
-});
-
-// ✅ Получить список папок для перемещения (рекурсивно, без текущей)
-app.get('/manager/list-folders/*', (req, res) => {
-    const requestedPath = req.params[0] || '';
-    let decodedPath = requestedPath;
-
-    if (!isValidPath(decodedPath)) {
-        return res.status(400).json({ error: 'Недопустимый путь' });
-    }
-
-    const fullPath = path.join(__dirname, 'teletext', decodedPath);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
-        return res.status(404).json({ error: 'Папка не найдена' });
-    }
-
-    const allFolders = [];
-
-    function scanDirectory(dir, relativeBasePath = '') {
-        const items = fs.readdirSync(dir);
-        items.forEach(item => {
-            const itemPath = path.join(dir, item);
-            const relativeItemPath = relativeBasePath ? path.join(relativeBasePath, item) : item;
-            if (fs.statSync(itemPath).isDirectory()) {
-                // Исключаем текущую папку (ту, где находимся)
-                if (path.resolve(itemPath) !== path.resolve(fullPath)) {
-                    allFolders.push({ name: item, path: relativeItemPath });
-                    scanDirectory(itemPath, relativeItemPath); // Рекурсивно сканируем
-                }
-            }
-        });
-    }
-
-    scanDirectory(path.join(__dirname, 'teletext')); // Начинаем сканировать от корня teletext
-
-    res.json(allFolders);
 });
 
 // ✅ Переименовать файл или папку
@@ -803,93 +773,10 @@ app.post('/move-item/*', (req, res) => {
     }
 });
 
-// ✅ Получить дерево папок (рекурсивно)
-app.get('/manager/tree-folders/*', (req, res) => {
-    const requestedPath = req.params[0] || '';
-    let decodedPath = requestedPath;
-
-    if (!isValidPath(decodedPath)) {
-        return res.status(400).json({ error: 'Недопустимый путь' });
-    }
-
-    const teletextDir = path.join(__dirname, 'teletext');
-
-    function scanDirectory(dir, relativeBasePath = '') {
-        const items = fs.readdirSync(dir);
-        const folders = [];
-
-        items.forEach(item => {
-            const itemPath = path.join(dir, item);
-            const relativeItemPath = relativeBasePath ? path.join(relativeBasePath, item) : item;
-
-            if (fs.statSync(itemPath).isDirectory()) {
-                const children = scanDirectory(itemPath, relativeItemPath); // Рекурсивно сканируем подпапки
-                folders.push({ name: item, path: relativeItemPath, children: children });
-            }
-        });
-
-        return folders;
-    }
-
-    try {
-        const tree = scanDirectory(teletextDir);
-        res.json(tree);
-    } catch (err) {
-        console.error('Ошибка при построении дерева папок:', err);
-        res.status(500).json({ error: 'Ошибка сервера' });
-    }
-});
-
-// ✅ Вставить вырезанный элемент (переместить в текущую папку)
-app.post('/paste-item/*', (req, res) => {
-    const requestedPath = req.params[0] || '';
-    const { itemName, type } = req.body;
-
-    if (!isValidPath(requestedPath) || !itemName || !['file', 'folder'].includes(type)) {
-        return res.status(400).json({ error: 'Некорректные данные' });
-    }
-
-    // Получаем данные из localStorage (это пример, в реальности нужно использовать session или БД)
-    // Для простоты — мы будем считать, что данные хранятся в localStorage на клиенте
-    // Но на сервере их нет, поэтому мы делаем так:
-    // Предположим, что вырезанный элемент был в папке, указанной в пути
-    const sourcePath = requestedPath; // Источник — текущая папка (это упрощение)
-    const targetPath = requestedPath; // Назначение — текущая папка
-
-    const cleanItemName = path.basename(itemName);
-    const sourcePathFull = path.join(__dirname, 'teletext', sourcePath, cleanItemName);
-    const targetPathFull = path.join(__dirname, 'teletext', targetPath, cleanItemName);
-
-    if (!fs.existsSync(sourcePathFull)) {
-        return res.status(404).json({ error: 'Объект не найден' });
-    }
-
-    if (fs.existsSync(targetPathFull)) {
-        return res.status(400).json({ error: 'Объект с таким именем уже существует' });
-    }
-
-    try {
-        fs.renameSync(sourcePathFull, targetPathFull);
-        logAction('ITEM_MOVED', `${type} ${sourcePathFull} -> ${targetPathFull}`);
-        res.json({ success: true });
-    } catch (err) {
-        logAction('ITEM_MOVE_ERROR', `${requestedPath}/${cleanItemName} -> ${targetPath}: ${err.message}`);
-        if (err.code === 'EPERM') {
-            return res.status(500).json({ error: `Ошибка перемещения: операция запрещена. Убедитесь, что объект не используется другим процессом.` });
-        } else {
-            return res.status(500).json({ error: `Ошибка перемещения: ${err.message}` });
-        }
-    }
-});
-
-
-
 // 404
 app.use((req, res) => {
     res.status(404).render('error', { message: 'Страница не найдена' });
 });
-
-
 
 app.listen(port, () => {
     logAction('SERVER_START', `http://localhost:${port}`);
