@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title><%= folderName.replace(/%20/g, '_') %> — Страницы</title>
+  <title><%= folderName.replace(/&nbsp;/g, '_') %> — Страницы</title>
   <link rel="stylesheet" href="/global.css"/>
   <style>
     .folder-container {
@@ -261,11 +261,11 @@
               <span class="breadcrumb-separator">➤</span>
               <% if (i === breadcrumb.length - 1) { %>
                 <span class="breadcrumb-item current">
-                  <span class="breadcrumb-text"><%= crumb.name.replace(/%20/g, '_') %></span>
+                  <span class="breadcrumb-text"><%= crumb.name.replace(/&nbsp;/g, '_') %></span>
                 </span>
               <% } else { %>
                 <a href="/folder/<%= encodeURI(crumb.path) %>" class="breadcrumb-item">
-                  <span class="breadcrumb-text"><%= crumb.name.replace(/%20/g, '_') %></span>
+                  <span class="breadcrumb-text"><%= crumb.name.replace(/&nbsp;/g, '_') %></span>
                 </a>
               <% } %>
             <% }) %>
@@ -276,14 +276,14 @@
       <% if (hasLogo) { %>
         <img id="header-logo" src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип" style="height:32px;vertical-align:middle;margin-right:8px;" />
       <% } %>
-      <%= folderName.replace(/%20/g, '_') %>
+      <%= folderName.replace(/&nbsp;/g, '_') %>
     </h2>
   </header>
 
   <div class="folder-container">
     <div class="content-wrapper">
       <div class="header">
-        <h1><%= folderName.replace(/%20/g, '_') %></h1>
+        <h1><%= folderName.replace(/&nbsp;/g, '_') %></h1>
         <div class="breadcrumb">
           Подпапок: <%= folders.length %>, страниц: <%= pages.length %>
         </div>
@@ -313,10 +313,10 @@
                     <span style="color:#ffcc00;font-size:1.2rem;">🌐</span>
                   <% } %>
 
-                  <span style="font-size:0.85rem; text-align:center; display:block; word-wrap:break-word; line-height:1.2; margin-top:6px;"><%= displayName.replace(/%20/g, '_') %></span>
+                  <span style="font-size:0.85rem; text-align:center; display:block; word-wrap:break-word; line-height:1.2; margin-top:6px;"><%= displayName.replace(/&nbsp;/g, '_') %></span>
 
                   <% if (description && description.trim()) { %>
-                    <span class="info-icon" onclick="openModal('<%= displayName.replace(/%20/g, '_') %>', '<%= description.replace(/'/g, "\\'").replace(/\n/g, "\\n") %>'); event.stopPropagation();">ℹ️</span>
+                    <span class="info-icon" onclick="openModal('<%= displayName.replace(/&nbsp;/g, '_') %>', '<%= description.replace(/'/g, "\\'").replace(/\n/g, "\\n") %>'); event.stopPropagation();">ℹ️</span>
                     <span class="tooltip">Описание</span>
                   <% } %>
                 </div>
@@ -410,7 +410,7 @@
     }
 
     function openModal(title, description) {
-      document.getElementById('modal-title').textContent = title.replace(/%20/g, '_');
+      document.getElementById('modal-title').textContent = title.replace(/&nbsp;/g, '_');
       document.getElementById('modal-body').textContent = description;
       document.getElementById('modal').style.display = 'flex';
     }
