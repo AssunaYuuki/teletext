@@ -288,6 +288,7 @@
       <input type="file" id="file-input" multiple directory webkitdirectory accept=".html,.png,.svg,.txt,.css,.js,.json,.jpg,.jpeg,.gif,.webp" />
       <button onclick="document.getElementById('file-input').click()">⬆️ Загрузить файлы/папки</button>
       <button onclick="pasteItem()" id="paste-btn" style="display:none; background: var(--card-bg); border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">📋 Вставить</button>
+      <button onclick="regenerateThumbnails('<%= currentPath %>')">🔄 Обновить превьюшки (250x250)</button>
     </div>
 
 <!-- Блок перетаскивания -->
@@ -717,6 +718,17 @@ function uploadFilesFromInput() {
 
     uploadFiles(formData);
 }
+
+ function regenerateThumbnails(path) {
+      if (!confirm('Вы уверены, что хотите перегенерировать все превьюшки в этой папке? Это может занять время.')) return;
+      fetch(`/regenerate-thumbnails/${encodeURIComponent(path)}`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          alert(data.success ? '✅ Превьюшки обновлены!' : '❌ Ошибка: ' + data.error);
+          location.reload();
+        })
+        .catch(err => alert('Ошибка сети'));
+    }
   </script>
 
 </body>

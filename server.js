@@ -127,6 +127,52 @@ async function generateThumbnail(htmlPath, pngPath) {
     }
 }
 
+
+// ✅ Перегенерация всех превьюшек в папке (250x250)
+app.post('/regenerate-thumbnails/*', async (req, res) => {
+    const requestedPath = req.params[0] || '';
+    let decodedPath = requestedPath;
+
+    if (!isValidPath(decodedPath)) {
+        return res.status(400).json({ error: 'Недопустимый путь' });
+    }
+
+    const fullPath = path.join(__dirname, 'teletext', decodedPath);
+    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+        return res.status(404).json({ error: 'Папка не найдена' });
+    }
+
+    const htmlFiles = fs.readdirSync(fullPath).filter(f => f.endsWith('.html'));
+
+    const errors = [];
+    const generated = [];
+
+    for (const file of htmlFiles) {
+        const pageStr = file.replace('.html', '');
+        const page = parseInt(pageStr, 10);
+        if (isNaN(page) || page < 100 || page > 999) continue;
+
+        const htmlPath = path.join(fullPath, file);
+        const pngPath = path.join(fullPath, `${page}.png`);
+
+        try {
+            await generateThumbnail(htmlPath, pngPath); // Функция уже будет генерировать 250x250
+            generated.push(`${page}.png`);
+            logAction('THUMBNAIL_REGENERATED', pngPath);
+        } catch (err) {
+            errors.push(`${file}: ${err.message}`);
+        }
+    }
+
+    if (errors.length > 0) {
+        res.status(500).json({ error: 'Частичная ошибка', errors, generated });
+    } else {
+        res.json({ success: true, generated });
+    }
+});
+
+
+
 const MAX_CONCURRENT = 3;
 async function generateThumbnailsForFolder(fullPath) {
     const htmlFiles = fs.readdirSync(fullPath).filter(f => f.endsWith('.html'));
