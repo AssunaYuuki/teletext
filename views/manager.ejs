@@ -164,8 +164,10 @@
       border: 2px solid var(--accent);
       border-radius: 6px;
       padding: 20px;
-      max-width: 400px;
+      max-width: 600px;
       width: 90%;
+      max-height: 70vh;
+      overflow: auto;
       box-shadow: 0 0 20px var(--glow);
       position: relative;
     }
@@ -229,15 +231,65 @@
       color: var(--bg);
     }
 
-    .move-target-select {
-      width: 100%;
-      padding: 8px;
+    /* Древовидный селектор папок */
+    .folder-tree {
       background: var(--hover-bg);
       border: 1px solid var(--accent);
-      color: var(--fg);
-      font-family: var(--font-mono);
       border-radius: 4px;
+      padding: 10px;
+      max-height: 300px;
+      overflow-y: auto;
       margin-top: 8px;
+    }
+
+    .folder-node {
+      list-style-type: none;
+      padding-left: 20px;
+      margin: 0;
+    }
+
+    .folder-node ul {
+      padding-left: 20px;
+    }
+
+    .folder-node-item {
+      margin: 2px 0;
+    }
+
+    .folder-node-toggle {
+      cursor: pointer;
+      background: none;
+      border: none;
+      color: var(--accent);
+      padding: 2px;
+      font-size: 0.9rem;
+    }
+
+    .folder-node-name {
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 2px;
+    }
+
+    .folder-node-name:hover {
+      background: rgba(0, 255, 153, 0.1);
+    }
+
+    .folder-node-name.selected {
+      background: rgba(0, 255, 153, 0.2);
+      color: #00ffaa;
+    }
+
+    .folder-node-icon {
+      margin-right: 4px;
+      font-size: 0.8rem;
+    }
+
+    .current-location {
+      font-size: 0.9rem;
+      color: var(--accent);
+      margin-top: 5px;
+      font-style: italic;
     }
   </style>
 </head>
@@ -252,7 +304,7 @@
           <% if (i === breadcrumb.length - 1) { %>
             <span> → <%= crumb.name %></span>
           <% } else { %>
-            <a href="/manager/<%= encodeURIComponent(crumb.path) %>"> → <%= crumb.name %></a>
+            <a href="/manager/<%= encodeURIComponent(crumb.path) %>"> → <%= crmb.name %></a>
           <% } %>
         <% }) %>
       <% } %>
@@ -349,10 +401,10 @@
       </div>
       <div class="modal-body">
         <p>Выберите папку для перемещения <strong id="move-target-name"></strong>:</p>
-        <select id="move-target-select" class="move-target-select">
-          <option value="">(корень)</option>
-          <!-- Опции будут заполнены скриптом -->
-        </select>
+        <div class="folder-tree" id="folder-tree">
+          <!-- Дерево папок будет загружено здесь -->
+        </div>
+        <div class="current-location" id="current-location">Выбранная папка: (корень)</div>
       </div>
       <div class="modal-footer">
         <button class="btn-cancel" onclick="closeModal('move-modal')">Отмена</button>
@@ -369,28 +421,79 @@
     const currentPath = `<%= currentPath %>`;
     let currentOperationTarget = null;
     let currentOperationType = null;
+    let selectedMoveTargetPath = null; // Хранит выбранный путь для перемещения
 
-    // Функция для загрузки списка папок для перемещения
-    async function loadFoldersForMove() {
+    // Функция для загрузки дерева папок
+    async function loadFolderTree() {
         try {
-            const res = await fetch(`/manager/list-folders/${encodeURIComponent(currentPath)}`);
+            const res = await fetch(`/manager/tree-folders/${encodeURIComponent(currentPath)}`);
             if (res.ok) {
-                const folders = await res.json();
-                const select = document.getElementById('move-target-select');
-                select.innerHTML = '<option value="">(корень)</option>';
-
-                folders.forEach(folder => {
-                    const option = document.createElement('option');
-                    option.value = folder.path;
-                    option.textContent = folder.name;
-                    select.appendChild(option);
-                });
+                const tree = await res.json();
+                const container = document.getElementById('folder-tree');
+                container.innerHTML = '';
+                const ul = document.createElement('ul');
+                ul.className = 'folder-node';
+                buildFolderTree(tree, ul);
+                container.appendChild(ul);
             } else {
-                console.error('Ошибка загрузки папок для перемещения');
+                console.error('Ошибка загрузки дерева папок');
             }
         } catch (err) {
-            console.error('Ошибка сети при загрузке папок для перемещения:', err);
+            console.error('Ошибка сети при загрузке дерева папок:', err);
         }
+    }
+
+    function buildFolderTree(node, parentElement) {
+        node.forEach(folder => {
+            const li = document.createElement('li');
+            li.className = 'folder-node-item';
+
+            const toggleSpan = document.createElement('span');
+            toggleSpan.className = 'folder-node-toggle';
+            toggleSpan.innerHTML = folder.children && folder.children.length > 0 ? '▶ ' : '• ';
+            toggleSpan.onclick = (e) => {
+                e.stopPropagation();
+                const ulChild = li.querySelector('ul');
+                if (ulChild) {
+                    if (ulChild.style.display === 'none') {
+                        ulChild.style.display = 'block';
+                        toggleSpan.innerHTML = '▼ ';
+                    } else {
+                        ulChild.style.display = 'none';
+                        toggleSpan.innerHTML = '▶ ';
+                    }
+                }
+            };
+
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'folder-node-name';
+            nameSpan.innerHTML = `<span class="folder-node-icon">📁</span>${folder.name}`;
+            nameSpan.onclick = () => {
+                // Снимаем выделение с других
+                document.querySelectorAll('.folder-node-name.selected').forEach(el => {
+                    el.classList.remove('selected');
+                });
+                // Выделяем текущий
+                nameSpan.classList.add('selected');
+                // Сохраняем путь
+                selectedMoveTargetPath = folder.path;
+                // Обновляем отображение
+                document.getElementById('current-location').textContent = `Выбранная папка: ${folder.path || '(корень)'} `;
+            };
+
+            li.appendChild(toggleSpan);
+            li.appendChild(nameSpan);
+
+            if (folder.children && folder.children.length > 0) {
+                const childUl = document.createElement('ul');
+                childUl.className = 'folder-node';
+                childUl.style.display = 'none'; // Скрыт по умолчанию
+                buildFolderTree(folder.children, childUl);
+                li.appendChild(childUl);
+            }
+
+            parentElement.appendChild(li);
+        });
     }
 
     function openRenameModal(name, type) {
@@ -405,7 +508,9 @@
         currentOperationTarget = name;
         currentOperationType = type;
         document.getElementById('move-target-name').textContent = name;
-        loadFoldersForMove(); // Загружаем папки перед открытием
+        selectedMoveTargetPath = null; // Сброс при открытии
+        document.getElementById('current-location').textContent = 'Выбранная папка: (корень)';
+        loadFolderTree(); // Загружаем дерево перед открытием
         document.getElementById('move-modal').style.display = 'flex';
     }
 
@@ -413,6 +518,7 @@
         document.getElementById(modalId).style.display = 'none';
         currentOperationTarget = null;
         currentOperationType = null;
+        selectedMoveTargetPath = null;
     }
 
     async function performRename() {
@@ -442,11 +548,13 @@
     }
 
     async function performMove() {
-        const targetPath = document.getElementById('move-target-select').value;
         if (!currentOperationTarget || !currentOperationType) {
             alert('Выберите папку назначения.');
             return;
         }
+
+        // Если не выбрана папка, то перемещаем в корень (currentPath)
+        const targetPath = selectedMoveTargetPath !== null ? selectedMoveTargetPath : '';
 
         try {
             const res = await fetch('/move-item/' + encodeURIComponent(currentPath), {

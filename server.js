@@ -803,6 +803,42 @@ app.post('/move-item/*', (req, res) => {
     }
 });
 
+// ✅ Получить дерево папок (рекурсивно)
+app.get('/manager/tree-folders/*', (req, res) => {
+    const requestedPath = req.params[0] || '';
+    let decodedPath = requestedPath;
+
+    if (!isValidPath(decodedPath)) {
+        return res.status(400).json({ error: 'Недопустимый путь' });
+    }
+
+    const teletextDir = path.join(__dirname, 'teletext');
+
+    function scanDirectory(dir, relativeBasePath = '') {
+        const items = fs.readdirSync(dir);
+        const folders = [];
+
+        items.forEach(item => {
+            const itemPath = path.join(dir, item);
+            const relativeItemPath = relativeBasePath ? path.join(relativeBasePath, item) : item;
+
+            if (fs.statSync(itemPath).isDirectory()) {
+                const children = scanDirectory(itemPath, relativeItemPath); // Рекурсивно сканируем подпапки
+                folders.push({ name: item, path: relativeItemPath, children: children });
+            }
+        });
+
+        return folders;
+    }
+
+    try {
+        const tree = scanDirectory(teletextDir);
+        res.json(tree);
+    } catch (err) {
+        console.error('Ошибка при построении дерева папок:', err);
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
 
 // 404
 app.use((req, res) => {
