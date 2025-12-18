@@ -281,14 +281,15 @@
     <h2>📁 Менеджер архивов</h2>
   </header>
 
-  <div class="manager-container">
-    <div class="controls">
-      <input type="text" id="folder-name" placeholder="Имя новой папки">
-      <button onclick="createFolder()">➕ Создать папку</button>
-      <input type="file" id="file-input" multiple directory webkitdirectory accept=".html,.png,.svg,.txt,.css,.js,.json,.jpg,.jpeg,.gif,.webp" />
-      <button onclick="document.getElementById('file-input').click()">⬆️ Загрузить файлы/папки</button>
-      <button onclick="pasteItem()" id="paste-btn" style="display:none; background: var(--card-bg); border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">📋 Вставить</button>
-    </div>
+<!-- Единый блок управления -->
+<div class="controls" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--card-bg); border: 2px solid var(--accent); padding: 15px; border-radius: 6px;">
+  <input type="text" id="folder-name" placeholder="Имя новой папки" style="padding: 8px; background: var(--hover-bg); border: 1px solid var(--accent); color: var(--fg); font-family: var(--font-mono); border-radius: 4px; width: 150px;">
+  <button onclick="createFolder()" style="padding: 8px 12px; background: var(--hover-bg); border: 1px solid var(--accent); color: var(--fg); font-family: var(--font-mono); border-radius: 4px; cursor: pointer;">➕ Создать папку</button>
+  <input type="file" id="file-input" multiple directory webkitdirectory accept=".html,.png,.svg,.txt,.css,.js,.json,.jpg,.jpeg,.gif,.webp" style="display: none;" />
+  <button onclick="document.getElementById('file-input').click()" style="padding: 8px 12px; background: var(--hover-bg); border: 1px solid var(--accent); color: var(--fg); font-family: var(--font-mono); border-radius: 4px; cursor: pointer;">📁 Выбрать файлы</button>
+  <button onclick="uploadFilesFromInput()" style="padding: 8px 12px; background: var(--hover-bg); border: 1px solid var(--accent); color: var(--fg); font-family: var(--font-mono); border-radius: 4px; cursor: pointer;">⬆️ Загрузить файлы/папки</button>
+  <button onclick="pasteItem()" id="paste-btn" style="display:none; padding: 8px 12px; background: var(--hover-bg); border: 1px solid var(--accent); color: var(--fg); font-family: var(--font-mono); border-radius: 4px; cursor: pointer;">📋 Вставить</button>
+</div>
 
     <!-- Блок перетаскивания -->
     <div id="drop-zone" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);" ondragleave="dragLeaveHandler(event);">
@@ -706,6 +707,16 @@ async function pasteItem() {
     } catch (err) {
         alert('Ошибка сети');
     }
+}
+
+function uploadFilesFromInput() {
+    const files = Array.from(document.getElementById('file-input').files);
+    if (files.length === 0) return;
+
+    const formData = new FormData();
+    files.forEach(f => formData.append('files', f));
+
+    uploadFiles(formData);
 }
   </script>
 
