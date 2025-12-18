@@ -77,7 +77,7 @@
     .item-card:hover {
       background: var(--hover-bg);
       transform: translateY(-3px);
-      box-shadow: var(--glow);
+      box-shadow: 0 4px 12px var(--shadow);
     }
 
     .item-card.folder {
@@ -121,6 +121,13 @@
       font-size: 1.2rem;
     }
 
+    .item-preview img {
+      width: 40px;
+      height: 40px;
+      object-fit: cover;
+      border-radius: 3px;
+    }
+
     .item-name {
       font-size: 0.85rem;
       word-break: break-word;
@@ -138,77 +145,105 @@
       opacity: 0.7;
     }
 
-    /* Drag & Drop */
-    #drop-zone {
-      border: 2px dashed var(--accent);
-      border-radius: 6px;
-      padding: 40px;
-      text-align: center;
-      color: var(--accent);
-      margin: 20px 0;
-      transition: all 0.2s ease;
-      background: rgba(14, 20, 16, 0.3);
-    }
-
-    #drop-zone.drag-over {
-      background: rgba(0, 255, 153, 0.1);
-      border-color: #00ffaa;
-      transform: scale(1.02);
-    }
-
-    #drop-zone p {
-      margin: 0;
-      font-size: 1rem;
-    }
-
-    /* Progress bar */
-    #progress-container {
+    /* Модальное окно */
+    .modal {
       display: none;
-      margin: 10px 0;
-      background: var(--hover-bg);
-      border-radius: 4px;
-      overflow: hidden;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      justify-content: center;
+      align-items: center;
     }
 
-    #progress-bar {
-      height: 10px;
-      background: var(--accent);
-      width: 0%;
-      transition: width 0.2s ease;
-    }
-
-    #progress-text {
-      font-size: 0.8rem;
-      color: var(--accent);
-      margin-top: 5px;
-    }
-
-    /* Uploading animation */
-    .uploading-card {
+    .modal-content {
+      background: var(--card-bg);
+      border: 2px solid var(--accent);
+      border-radius: 6px;
+      padding: 20px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 0 20px var(--glow);
       position: relative;
-      opacity: 0.7;
     }
 
-    .uploading-card .item-preview::after {
-      content: "🌀";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .modal-title {
+      color: var(--accent);
+      font-size: 1.2rem;
+    }
+
+    .close {
+      color: #ff6666;
       font-size: 1.5rem;
-      animation: spin 1s linear infinite;
+      font-weight: bold;
+      cursor: pointer;
     }
 
-    @keyframes spin {
-      0% { transform: translate(-50%, -50%) rotate(0deg); }
-      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    .modal-body {
+      color: var(--fg);
+      font-size: 0.9rem;
+      margin-bottom: 15px;
+    }
+
+    .modal-footer {
+      margin-top: 15px;
+      text-align: right;
+    }
+
+    .btn-action {
+      background: var(--card-bg);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 6px;
+    }
+
+    .btn-action:hover {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .btn-cancel {
+      background: var(--card-bg);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .btn-cancel:hover {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .move-target-select {
+      width: 100%;
+      padding: 8px;
+      background: var(--hover-bg);
+      border: 1px solid var(--accent);
+      color: var(--fg);
+      font-family: var(--font-mono);
+      border-radius: 4px;
+      margin-top: 8px;
     }
   </style>
 </head>
 <body>
 
-  <header>
-    <h1>📁 Менеджер архивов</h1>
+  <header class="nav-bar">
     <div class="breadcrumb">
       <a href="/">🏠 Главная</a>
       <a href="/manager/"> / teletext</a>
@@ -222,13 +257,15 @@
         <% }) %>
       <% } %>
     </div>
+
+    <h2>📁 Менеджер архивов</h2>
   </header>
 
   <div class="manager-container">
     <div class="controls">
       <input type="text" id="folder-name" placeholder="Имя новой папки">
       <button onclick="createFolder()">➕ Создать папку</button>
-      <input type="file" id="file-input" multiple directory webkitdirectory accept=".html,.png,.svg,.txt" />
+      <input type="file" id="file-input" multiple directory webkitdirectory accept=".html,.png,.svg,.txt,.css,.js,.json,.jpg,.jpeg,.gif,.webp" />
       <button onclick="document.getElementById('file-input').click()">⬆️ Загрузить файлы/папки</button>
     </div>
 
@@ -244,17 +281,20 @@
     <div class="items-grid" id="items-list">
       <% if (folders.length === 0 && files.length === 0) { %>
         <div class="empty-state">
-          <p>📁 Папка пуста</p>
+          <p>📁 Папка <code>teletext/<%= currentPath ? currentPath + '/' : '' %></code> пуста</p>
+          <p>Создайте папку или загрузите файлы</p>
         </div>
       <% } %>
 
       <% folders.forEach(folder => { %>
-        <div class="item-card folder">
+        <div class="item-card folder" data-name="<%= folder.name %>" data-type="folder">
           <div class="item-actions">
+            <button title="Переименовать папку" onclick="openRenameModal('<%= folder.name %>', 'folder')">✏️</button>
+            <button title="Переместить папку" onclick="openMoveModal('<%= folder.name %>', 'folder')">🚚</button>
             <button title="Удалить папку" onclick="deleteItem('<%= folder.name %>', 'folder')">✕</button>
           </div>
           <a href="/manager/<%= encodeURIComponent(folder.path) %>" style="display:block; text-decoration:none; color:inherit;">
-            <div class="item-preview">📂</div>
+            <div class="item-preview">📁</div>
             <div class="item-name"><%= folder.name %></div>
             <div class="item-size"><%= folder.isEmpty ? 'пустая' : 'есть содержимое' %></div>
           </a>
@@ -262,8 +302,10 @@
       <% }) %>
 
       <% files.forEach(file => { %>
-        <div class="item-card file">
+        <div class="item-card file" data-name="<%= file.name %>" data-type="file">
           <div class="item-actions">
+            <button title="Переименовать файл" onclick="openRenameModal('<%= file.name %>', 'file')">✏️</button>
+            <button title="Переместить файл" onclick="openMoveModal('<%= file.name %>', 'file')">🚚</button>
             <button title="Удалить файл" onclick="deleteItem('<%= file.name %>', 'file')">✕</button>
           </div>
           <div class="item-preview">
@@ -280,18 +322,158 @@
     </div>
   </div>
 
+  <!-- Модальное окно переименования -->
+  <div id="rename-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">✏️ Переименовать</div>
+        <span class="close" onclick="closeModal('rename-modal')">&times;</span>
+      </div>
+      <div class="modal-body">
+        <p>Введите новое имя для <strong id="rename-target-name"></strong>:</p>
+        <input type="text" id="new-name-input" placeholder="Новое имя" style="width:100%; padding:8px; background:var(--hover-bg); border:1px solid var(--accent); color:var(--fg); border-radius:4px; font-family:var(--font-mono);">
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeModal('rename-modal')">Отмена</button>
+        <button class="btn-action" onclick="performRename()">Переименовать</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно перемещения -->
+  <div id="move-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">🚚 Переместить</div>
+        <span class="close" onclick="closeModal('move-modal')">&times;</span>
+      </div>
+      <div class="modal-body">
+        <p>Выберите папку для перемещения <strong id="move-target-name"></strong>:</p>
+        <select id="move-target-select" class="move-target-select">
+          <option value="">(корень)</option>
+          <!-- Опции будут заполнены скриптом -->
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeModal('move-modal')">Отмена</button>
+        <button class="btn-action" onclick="performMove()">Переместить</button>
+      </div>
+    </div>
+  </div>
+
   <footer>
     <a href="/" class="btn">🏠 На главную</a>
   </footer>
 
   <script>
+    const currentPath = `<%= currentPath %>`;
+    let currentOperationTarget = null;
+    let currentOperationType = null;
+
+    // Функция для загрузки списка папок для перемещения
+    async function loadFoldersForMove() {
+        try {
+            const res = await fetch(`/manager/list-folders/${encodeURIComponent(currentPath)}`);
+            if (res.ok) {
+                const folders = await res.json();
+                const select = document.getElementById('move-target-select');
+                select.innerHTML = '<option value="">(корень)</option>';
+
+                folders.forEach(folder => {
+                    const option = document.createElement('option');
+                    option.value = folder.path;
+                    option.textContent = folder.name;
+                    select.appendChild(option);
+                });
+            } else {
+                console.error('Ошибка загрузки папок для перемещения');
+            }
+        } catch (err) {
+            console.error('Ошибка сети при загрузке папок для перемещения:', err);
+        }
+    }
+
+    function openRenameModal(name, type) {
+        currentOperationTarget = name;
+        currentOperationType = type;
+        document.getElementById('rename-target-name').textContent = name;
+        document.getElementById('new-name-input').value = name;
+        document.getElementById('rename-modal').style.display = 'flex';
+    }
+
+    function openMoveModal(name, type) {
+        currentOperationTarget = name;
+        currentOperationType = type;
+        document.getElementById('move-target-name').textContent = name;
+        loadFoldersForMove(); // Загружаем папки перед открытием
+        document.getElementById('move-modal').style.display = 'flex';
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
+        currentOperationTarget = null;
+        currentOperationType = null;
+    }
+
+    async function performRename() {
+        const newName = document.getElementById('new-name-input').value.trim();
+        if (!newName || !currentOperationTarget || !currentOperationType) {
+            alert('Введите корректное имя.');
+            return;
+        }
+
+        try {
+            const res = await fetch('/rename-item/' + encodeURIComponent(currentPath), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ oldName: currentOperationTarget, newName: newName, type: currentOperationType })
+            });
+
+            if (res.ok) {
+                closeModal('rename-modal');
+                location.reload();
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Ошибка переименования');
+            }
+        } catch (err) {
+            alert('Ошибка сети');
+        }
+    }
+
+    async function performMove() {
+        const targetPath = document.getElementById('move-target-select').value;
+        if (!currentOperationTarget || !currentOperationType) {
+            alert('Выберите папку назначения.');
+            return;
+        }
+
+        try {
+            const res = await fetch('/move-item/' + encodeURIComponent(currentPath), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ itemName: currentOperationTarget, targetPath: targetPath, type: currentOperationType })
+            });
+
+            if (res.ok) {
+                closeModal('move-modal');
+                location.reload();
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Ошибка перемещения');
+            }
+        } catch (err) {
+            alert('Ошибка сети');
+        }
+    }
+
     async function createFolder() {
       const input = document.getElementById('folder-name');
       const name = input.value.trim();
       if (!name) return alert('Введите имя папки');
 
       try {
-        const res = await fetch(`/create-folder/<%= encodeURIComponent(currentPath) %>`, {
+        const res = await fetch(`/create-folder/${encodeURIComponent(currentPath)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name })
@@ -314,8 +496,63 @@
       const formData = new FormData();
       files.forEach(f => formData.append('files', f));
 
-      await uploadFiles(formData);
+      try {
+        const res = await fetch(`/upload/${encodeURIComponent(currentPath)}`, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success || data.saved) {
+          location.reload();
+        } else {
+          alert(data.error || 'Ошибка загрузки');
+        }
+      } catch (err) {
+        alert('Ошибка сети');
+      }
     };
+
+    // Drag & Drop handlers
+    function dragOverHandler(ev) {
+      ev.preventDefault();
+      document.getElementById('drop-zone').classList.add('drag-over');
+    }
+
+    function dragLeaveHandler(ev) {
+      ev.preventDefault();
+      document.getElementById('drop-zone').classList.remove('drag-over');
+    }
+
+    function dropHandler(ev) {
+      ev.preventDefault();
+      document.getElementById('drop-zone').classList.remove('drag-over');
+
+      const items = ev.dataTransfer.items;
+
+      if (items) {
+        let hasDirectory = false;
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i].webkitGetAsEntry();
+          if (item && item.isDirectory) {
+            hasDirectory = true;
+            break;
+          }
+        }
+
+        if (hasDirectory) {
+          alert('Загрузка папок через drag\'n\'drop пока не поддерживается. Используйте кнопку "Загрузить файлы/папки".');
+          return;
+        }
+      }
+
+      const files = Array.from(ev.dataTransfer.files);
+      if (files.length === 0) return;
+
+      const formData = new FormData();
+      files.forEach(f => formData.append('files', f));
+
+      uploadFiles(formData);
+    }
 
     async function uploadFiles(formData) {
       const progressContainer = document.getElementById('progress-container');
@@ -324,7 +561,6 @@
 
       progressContainer.style.display = 'block';
 
-      // Имитация прогресса
       let progress = 0;
       const interval = setInterval(() => {
         if (progress < 90) {
@@ -335,7 +571,7 @@
       }, 200);
 
       try {
-        const res = await fetch(`/upload/<%= encodeURIComponent(currentPath) %>`, {
+        const res = await fetch(`/upload/${encodeURIComponent(currentPath)}`, {
           method: 'POST',
           body: formData
         });
@@ -368,49 +604,6 @@
       }
     }
 
-    // Drag & Drop handlers
-    function dragOverHandler(ev) {
-      ev.preventDefault();
-      document.getElementById('drop-zone').classList.add('drag-over');
-    }
-
-    function dragLeaveHandler(ev) {
-      ev.preventDefault();
-      document.getElementById('drop-zone').classList.remove('drag-over');
-    }
-
-    function dropHandler(ev) {
-      ev.preventDefault();
-      document.getElementById('drop-zone').classList.remove('drag-over');
-
-      const items = ev.dataTransfer.items;
-
-      if (items) {
-        // Проверяем, есть ли папки
-        let hasDirectory = false;
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i].webkitGetAsEntry();
-          if (item && item.isDirectory) {
-            hasDirectory = true;
-            break;
-          }
-        }
-
-        if (hasDirectory) {
-          alert('Загрузка папок через drag\'n\'drop пока не поддерживается. Используйте кнопку "Загрузить файлы/папки".');
-          return;
-        }
-      }
-
-      const files = Array.from(ev.dataTransfer.files);
-      if (files.length === 0) return;
-
-      const formData = new FormData();
-      files.forEach(f => formData.append('files', f));
-
-      uploadFiles(formData);
-    }
-
     async function deleteItem(name, type) {
       const typeName = type === 'folder' ? 'папку' : 'файл';
       const confirmText = type === 'folder'
@@ -420,7 +613,7 @@
       if (!confirm(confirmText)) return;
 
       try {
-        const res = await fetch(`/delete-item/<%= encodeURIComponent(currentPath) %>`, {
+        const res = await fetch('/delete-item/' + encodeURIComponent(currentPath), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, type })

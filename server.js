@@ -661,6 +661,149 @@ app.post('/upload/*', uploadFiles.any(), async (req, res) => {
     res.json({ success: true, saved });
 });
 
+// ✅ Получить список папок для перемещения (рекурсивно, без текущей)
+app.get('/manager/list-folders/*', (req, res) => {
+    const requestedPath = req.params[0] || '';
+    let decodedPath = requestedPath;
+
+    if (!isValidPath(decodedPath)) {
+        return res.status(400).json({ error: 'Недопустимый путь' });
+    }
+
+    const fullPath = path.join(__dirname, 'teletext', decodedPath);
+    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+        return res.status(404).json({ error: 'Папка не найдена' });
+    }
+
+    const allFolders = [];
+
+    function scanDirectory(dir, relativeBasePath = '') {
+        const items = fs.readdirSync(dir);
+        items.forEach(item => {
+            const itemPath = path.join(dir, item);
+            const relativeItemPath = relativeBasePath ? path.join(relativeBasePath, item) : item;
+            if (fs.statSync(itemPath).isDirectory()) {
+                // Исключаем текущую папку (ту, где находимся)
+                if (path.resolve(itemPath) !== path.resolve(fullPath)) {
+                    allFolders.push({ name: item, path: relativeItemPath });
+                    scanDirectory(itemPath, relativeItemPath); // Рекурсивно сканируем
+                }
+            }
+        });
+    }
+
+    scanDirectory(path.join(__dirname, 'teletext')); // Начинаем сканировать от корня teletext
+
+    res.json(allFolders);
+});
+
+// ✅ Переименовать файл или папку
+app.post('/rename-item/*', (req, res) => {
+    const requestedPath = req.params[0] || '';
+    const { oldName, newName, type } = req.body;
+
+    if (!isValidPath(requestedPath) || !oldName || !newName || !['file', 'folder'].includes(type)) {
+        return res.status(400).json({ error: 'Некорректные данные' });
+    }
+
+    const cleanOldName = path.basename(oldName);
+    const cleanNewName = path.basename(newName);
+    const sourcePath = path.join(__dirname, 'teletext', requestedPath, cleanOldName);
+    const targetPath = path.join(__dirname, 'teletext', requestedPath, cleanNewName);
+
+    if (!fs.existsSync(sourcePath)) {
+        return res.status(404).json({ error: 'Объект не найден' });
+    }
+
+    if (fs.existsSync(targetPath)) {
+        return res.status(400).json({ error: 'Объект с таким именем уже существует' });
+    }
+
+    try {
+        // Попытка переименования с повторами
+        const maxRetries = 3;
+        let success = false;
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                fs.renameSync(sourcePath, targetPath);
+                success = true;
+                logAction('ITEM_RENAMED', `${type} ${sourcePath} -> ${targetPath}`);
+                break;
+            } catch (renameErr) {
+                if (renameErr.code === 'EPERM' && i < maxRetries - 1) {
+                    logAction('ITEM_RENAME_RETRY', `${requestedPath}/${cleanOldName}: попытка ${i + 1} из ${maxRetries} (EPERM)`);
+                    // Задержка перед повторной попыткой
+                    const start = Date.now();
+                    while (Date.now() - start < 1000);
+                } else {
+                    throw renameErr; // Прерываем цикл, если не EPERM или последняя попытка
+                }
+            }
+        }
+
+        if (!success) {
+            throw new Error(`Не удалось переименовать после ${maxRetries} попыток`);
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        logAction('ITEM_RENAME_ERROR', `${requestedPath}/${cleanOldName}: ${err.message}`);
+        if (err.code === 'EPERM') {
+            return res.status(500).json({ error: `Ошибка переименования: операция запрещена. Убедитесь, что объект не используется другим процессом.` });
+        } else {
+            return res.status(500).json({ error: `Ошибка переименования: ${err.message}` });
+        }
+    }
+});
+
+// ✅ Переместить файл или папку
+app.post('/move-item/*', (req, res) => {
+    const requestedPath = req.params[0] || '';
+    const { itemName, targetPath, type } = req.body;
+
+    if (!isValidPath(requestedPath) || !itemName || !['file', 'folder'].includes(type)) {
+        return res.status(400).json({ error: 'Некорректные данные' });
+    }
+
+    // Если targetPath пустой, значит перемещаем в корень (currentPath)
+    const finalTargetPath = targetPath ? path.join(targetPath) : requestedPath;
+    if (!isValidPath(finalTargetPath)) {
+        return res.status(400).json({ error: 'Недопустимый путь назначения' });
+    }
+
+    const cleanItemName = path.basename(itemName);
+    const sourcePath = path.join(__dirname, 'teletext', requestedPath, cleanItemName);
+    const targetDirPath = path.join(__dirname, 'teletext', finalTargetPath);
+    const targetItemPath = path.join(targetDirPath, cleanItemName);
+
+    if (!fs.existsSync(sourcePath)) {
+        return res.status(404).json({ error: 'Объект не найден' });
+    }
+
+    if (!fs.existsSync(targetDirPath) || !fs.statSync(targetDirPath).isDirectory()) {
+        return res.status(404).json({ error: 'Папка назначения не найдена' });
+    }
+
+    if (fs.existsSync(targetItemPath)) {
+        return res.status(400).json({ error: 'Объект с таким именем уже существует в папке назначения' });
+    }
+
+    try {
+        // fs.renameSync может перемещать как файлы, так и папки
+        fs.renameSync(sourcePath, targetItemPath);
+        logAction('ITEM_MOVED', `${type} ${sourcePath} -> ${targetItemPath}`);
+        res.json({ success: true });
+    } catch (err) {
+        logAction('ITEM_MOVE_ERROR', `${requestedPath}/${cleanItemName} -> ${finalTargetPath}: ${err.message}`);
+        if (err.code === 'EPERM') {
+            return res.status(500).json({ error: `Ошибка перемещения: операция запрещена. Убедитесь, что объект не используется другим процессом.` });
+        } else {
+            return res.status(500).json({ error: `Ошибка перемещения: ${err.message}` });
+        }
+    }
+});
+
+
 // 404
 app.use((req, res) => {
     res.status(404).render('error', { message: 'Страница не найдена' });
