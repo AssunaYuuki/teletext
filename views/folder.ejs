@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= folderName %> — Подпапки</title>
+  <title><%= folderName %> — Страницы</title>
   <link rel="stylesheet" href="/global.css">
   <style>
     .folder-container {
@@ -112,6 +112,32 @@
       padding: 0;
       line-height: 1;
       text-decoration: none;
+    }
+
+    .thumbs-grid {
+      margin-top: 30px;
+    }
+
+    .thumbs-grid .grid {
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+
+    .thumb-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 6px;
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      text-decoration: none;
+      color: var(--fg);
+    }
+
+    .thumb-item img {
+      width: 100%;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 3px;
     }
 
     /* Значок информации */
@@ -252,19 +278,24 @@
     }
 
     .year-folder-item {
+      position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       padding: 12px;
+      background: var(--card-bg);
       border: 1px solid var(--accent);
       border-radius: 6px;
       text-decoration: none;
       color: var(--fg);
       transition: all 0.2s ease;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
     }
 
     .year-folder-item:hover {
-      background: var(--hover-bg);
       transform: translateY(-3px);
       box-shadow: 0 4px 12px rgba(0, 255, 136, 0.2);
       border-color: #00ffaa;
@@ -282,29 +313,76 @@
       text-align: center;
       color: var(--accent);
       font-size: 0.85rem;
-      margin-top: 6px;
       word-wrap: break-word;
       line-height: 1.2;
+      margin-top: 6px;
     }
 
-
-    .subfolders-by-year-header {
-      background: var(--card-bg);
-      border: 1px solid var(--accent);
-      border-radius: 6px;
-      padding: 15px;
-      margin: 20px 0;
-      text-align: center;
-      font-size: 1.1rem;
-      color: var(--accent);
-      text-shadow: 0 0 5px rgba(0, 255, 153, 0.4);
+    /* Кнопки редактирования и информации для годовых карточек */
+    .year-edit-btn-wrapper {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 15px;
+      height: 16px;
+      padding: 2px;
+      background: transparent;
+      border: none;
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 10;
+      transition: all 0.2s;
+      box-shadow: none;
+      outline: none;
+      text-decoration: none;
+      pointer-events: auto;
     }
 
-    .no-year {
-      text-align: center;
-      font-size: 1.1rem;
+    .year-edit-btn-wrapper span {
+      font-size: 0.7rem;
+      color: #ff6600;
+      font-weight: bold;
+      margin: 0;
+      padding: 0;
+      line-height: 1;
+      text-decoration: none;
+    }
+
+    .year-info-icon {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      font-size: 0.7rem;
+      color: #00ffaa;
+      opacity: 0.7;
+      transition: opacity 0.2s ease;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    .year-folder-item:hover .year-info-icon {
+      opacity: 1;
+    }
+
+    .year-tooltip {
+      position: absolute;
+      top: 20px;
+      left: 0;
+      white-space: nowrap;
+      font-size: 0.7rem;
       color: var(--accent);
-      margin: 10px 0;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      pointer-events: none;
+      z-index: 11;
+    }
+
+    .year-info-icon:hover + .year-tooltip,
+    .year-info-icon:focus + .year-tooltip {
+      opacity: 1;
     }
   </style>
 </head>
@@ -341,17 +419,16 @@
         </div>
       </div>
 
-
-       <% if (groupedFolders && Object.keys(groupedFolders).length > 0) { %>
-        <section class="thumbs-grid">
-          <div class="subfolders-by-year-header">
-          </div>
+      <!-- ✅ Показываем подпапки, сгруппированные по годам -->
+      <% if (groupedFolders && Object.keys(groupedFolders).length > 0) { %>
+        <section>
+          <h3>📁 Подпапки</h3>
           <% Object.entries(groupedFolders).forEach(([year, foldersInYear]) => { %>
             <div class="year-section">
-              <% if (year === '0') { %>
-                <h4 class="year-header">Без года</h4>
-              <% } else { %>
+              <% if (year !== '0') { %>
                 <h4 class="year-header"><%= year %></h4>
+              <% } else { %>
+                <h4 class="year-header">Без года</h4>
               <% } %>
               <div class="year-folders-grid">
                 <% foldersInYear.forEach(folder => {
@@ -360,21 +437,38 @@
                     const displayName = card.displayName || folder;
                     const description = card.description || '';
                 %>
-                  <div class="year-folder-item" onclick="updateHeaderLogo(this); window.location.href='/folder/<%= encodeURIComponent(currentPath ? currentPath + '/' + folder : folder) %>';">
-                    <% if (logoUrl) { %>
-                      <img src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип" style="height:32px; max-width: 100%; object-fit: contain; margin-top:8px;">
-                    <% } else { %>
-                      <span style="color:#ffcc00;font-size:1.2rem;">🌐</span>
-                    <% } %>
-                    <span style="font-size:0.85rem; text-align:center; display:block; word-wrap:break-word; line-height:1.2; margin-top:6px;"><%= displayName %></span>
+                  <div class="card-container" style="position:relative; display:inline-block;">
+                    <div class="year-folder-item"
+                         data-logo="<%= logoUrl || '' %>"
+                         data-folder="<%= folder %>"
+                         data-path="<%= currentPath ? currentPath + '/' + folder : folder %>"
+                         onclick="updateHeaderLogo(this); window.location.href='/folder/<%= encodeURIComponent(currentPath ? currentPath + '/' + folder : folder) %>';"
+                         onmouseenter="showEditButton(this)"
+                         onmouseleave="hideEditButton(this)"
+                         >
+
+                      <% if (logoUrl) { %>
+                        <img src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип" style="height:32px; max-width: 100%; object-fit: contain; margin-top:8px;">
+                      <% } else { %>
+                        <span style="color:#ffcc00;font-size:1.2rem;">🌐</span>
+                      <% } %>
+
+                      <span style="font-size:0.85rem; text-align:center; display:block; word-wrap:break-word; line-height:1.2; margin-top:6px;"><%= displayName %></span>
+
+                      <% if (description && description.trim()) { %>
+                        <span class="year-info-icon" onclick="openModal('<%= displayName.replace(/'/g, "\\'") %>', '<%= description.replace(/'/g, "\\'").replace(/\n/g, "\\n") %>'); event.stopPropagation();">ℹ️</span>
+                        <span class="year-tooltip">Описание</span>
+                      <% } %>
+
+                    </div>
                   </div>
                 <% }) %>
               </div>
             </div>
           <% }) %>
         </section>
-      <% } else { %>
-        <!-- ✅ Если это страна — показываем обычные карточки подпапок -->
+      <% } else if (folders.length > 0) { %>
+        <!-- ✅ Если нет группировки (все папки без дат) — показываем как обычно -->
         <section>
           <h3>📁 Подпапки</h3>
           <div class="grid">
@@ -412,6 +506,35 @@
             <% }) %>
           </div>
         </section>
+      <% } %>
+
+      <% if (htmlFiles.length > 0) { %>
+        <section class="thumbs-grid">
+          <h3>🖼️ Страницы</h3>
+          <div class="grid">
+            <% htmlFiles.forEach(file => {
+                const pageStr = file.replace('.html', '');
+                const page = parseInt(pageStr, 10);
+                if (isNaN(page) || page < 100 || page > 999) return;
+                const hasThumb = fs.existsSync(path.join(fullPath, `${pageStr}.png`));
+            %>
+              <a href="/page/<%= encodeURIComponent(currentPath) %>/<%= page %>" class="thumb-item">
+                <% if (hasThumb) { %>
+                  <img src="<%= `/teletext/${currentPath}/${page}.png` %>" alt="Стр. <%= page %>">
+                <% } else { %>
+                  <div style="height:80px; width:100%; background:#0a220a; display:flex; align-items:center; justify-content:center; color:#00ff88; font-size:1.1rem; font-weight:bold;">
+                    <%= page %>
+                  </div>
+                <% } %>
+                <span style="margin-top:4px; font-size:0.85rem;"><%= page %></span>
+              </a>
+            <% }) %>
+          </div>
+        </section>
+      <% } else if (folders.length === 0) { %>
+        <div class="empty" style="text-align:center; margin-top:40px;">
+          <p>Нет ни подпапок, ни страниц.</p>
+        </div>
       <% } %>
 
       <footer style="margin-top: 30px; text-align: center; font-size: 0.85rem; opacity: 0.7;">
