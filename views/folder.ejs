@@ -515,7 +515,7 @@
             <% pages.forEach(item => { %>
               <a href="/page/<%= encodeURIComponent(currentPath) %>/<%= item.page %>" class="thumb-item">
                 <% if (item.hasThumb) { %>
-                  <img src="<%= `/teletext/${currentPath}/${item.page}.png` %>" alt="Стр. <%= item.page %>">
+                                            <img src="<%= `/teletext/${currentPath}/${item.page}.png` %>?t=<%= Date.now() %>" alt="Стр. <%= item.page %>" onerror="this.src='https://tele.assunayuuki.ru/teletext/images/no-preview.png'; this.alt='Нет превью';">
                 <% } else { %>
                   <div style="height:80px; width:100%; background:#0a220a; display:flex; align-items:center; justify-content:center; color:#00ff88; font-size:1.1rem; font-weight:bold;">
                     <%= item.page %>
