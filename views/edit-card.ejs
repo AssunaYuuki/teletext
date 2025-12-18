@@ -103,7 +103,6 @@
       max-width: 100%;
       object-fit: contain;
       margin-bottom: 10px;
-      border-radius: 4px;
       display: block;
       margin-left: auto;
       margin-right: auto;
@@ -123,7 +122,7 @@
       border-radius: 6px;
       margin: 20px 0;
       border: 1px solid rgba(0, 255, 153, 0.2);
-      box-shadow: 0 0 8px rgba(0, 255, 153, 0.1);
+      box-shadow: 0 0 8px var(--shadow);
     }
 
     .form-section h2 {
@@ -201,7 +200,7 @@
     .btn:hover {
       background: var(--accent);
       color: var(--bg);
-      box-shadow: 0 0 10px rgba(0, 255, 153, 0.5);
+      box-shadow: var(--glow);
     }
 
     .btn-red {
@@ -366,12 +365,12 @@
     <% } %>
 
     <footer>
-      <a href="/" class="btn" style="padding:6px 12px;">🏠 На главную</a>
+      <a href="/" class="btn">🏠 На главную</a>
     </footer>
   </div>
 
   <script>
-    // Обработка формы без перезагрузки
+    // ✅ 5. Обновление логотипа и названия без перезагрузки
     document.getElementById('edit-form').addEventListener('submit', async function(e) {
       e.preventDefault();
 
@@ -382,16 +381,16 @@
       // Индикатор загрузки
       submitBtn.classList.add('loading');
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Сохранение';
+      submitBtn.textContent = 'Сохранение...';
 
       try {
-        const response = await fetch(this.action, {
+        const res = await fetch(this.action, {
           method: 'POST',
           body: formData
         });
 
-        if (response.ok) {
-          // Показать уведомление
+        if (res.ok) {
+          // ✅ Показать уведомление
           const notification = document.getElementById('notification');
           notification.classList.add('show');
           setTimeout(() => {
@@ -402,24 +401,47 @@
             }, 300);
           }, 2000);
 
-          // Обновить превью
+          // ✅ Обновить превью карточки
           const newTitle = formData.get('title');
           document.getElementById('preview-title').textContent = newTitle;
 
-          // Если был загружен логотип — обновить превью
-          const logoFile = formData.get('logo');
-          if (logoFile && logoFile.size > 0) {
+          const newLogoFile = formData.get('logo');
+          if (newLogoFile && newLogoFile.size > 0) {
             const reader = new FileReader();
             reader.onload = function(e) {
               document.getElementById('preview-logo').src = e.target.result;
               document.getElementById('current-logo').src = e.target.result;
             };
-            reader.readAsDataURL(logoFile);
+            reader.readAsDataURL(newLogoFile);
           }
 
-          // Перенаправляем на новую папку (если название изменилось)
+          // ✅ Обновить логотип в хедере (если он есть)
+          const headerLogo = document.querySelector('#header-logo');
+          if (newLogoFile && newLogoFile.size > 0 && headerLogo) {
+            const headerReader = new FileReader();
+            headerReader.onload = function(e) {
+              headerLogo.src = e.target.result;
+            };
+            headerReader.readAsDataURL(newLogoFile);
+          }
+
+          // ✅ Обновить название в хедере
+          const headerTitleElement = document.querySelector('header h2');
+          if (headerTitleElement) {
+            // Удаляем старое название (но оставляем логотип)
+            const logoImg = headerTitleElement.querySelector('img');
+            headerTitleElement.innerHTML = '';
+            if (logoImg) {
+              headerTitleElement.appendChild(logoImg);
+              headerTitleElement.appendChild(document.createTextNode(' '));
+            }
+            headerTitleElement.appendChild(document.createTextNode(newTitle));
+          }
+
+          // ✅ Проверяем, изменилось ли имя папки
           const currentFolderName = '<%= folderName %>';
           if (newTitle && newTitle !== currentFolderName) {
+            // Если имя изменилось, перенаправляем на новую папку
             const currentPath = '<%= archivePath %>';
             const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
             const newPath = parentPath ? `${parentPath}/${encodeURIComponent(newTitle)}` : encodeURIComponent(newTitle);
@@ -434,11 +456,11 @@
             }, 2000);
           }
         } else {
-          const errorText = await response.text();
-          alert('Ошибка при сохранении: ' + response.status + ' - ' + errorText);
+          const errorText = await res.text();
+          alert('Ошибка: ' + errorText);
         }
       } catch (err) {
-        alert('Ошибка сети: ' + err.message);
+        alert('Ошибка сети');
       } finally {
         submitBtn.classList.remove('loading');
         submitBtn.disabled = false;
