@@ -202,36 +202,63 @@
   </div>
 
   <script>
-    const folderPath = `<%= currentPath %>`;
-    const currentPage = <%= pageNumber %>;
-    const prevPage = <%= prevPage !== null ? prevPage : 'null' %>;
-    const nextPage = <%= nextPage !== null ? nextPage : 'null' %>;
-    const allPages = [<%= pageList.map(p => p.page).join(',') %>];
+    const currentPath = `<%= currentPath %>`;
+    const currentPageNum = <%= pageNumber %>;
+    const prevPageNum = <%= prevPage !== null ? prevPage : 'null' %>;
+    const nextPageNum = <%= nextPage !== null ? nextPage : 'null' %>;
+    const allPageNumbers = [<%= pageList.map(p => p.page).join(',') %>];
 
     function goToPage(num) {
-      if (num === null || !allPages.includes(num)) return;
-      const encodedPath = folderPath ? encodeURIComponent(folderPath) : ''; // ← Только при формировании URL
+      if (num === null || !allPageNumbers.includes(num)) return;
+      const encodedPath = currentPath ? encodeURIComponent(currentPath) : '';
       window.location.href = `/page/${encodedPath}/${num}`;
     }
 
-    document.getElementById('prev').onclick = () => goToPage(prevPage);
-    document.getElementById('next').onclick = () => goToPage(nextPage);
+    document.getElementById('prev').onclick = () => goToPage(prevPageNum);
+    document.getElementById('next').onclick = () => goToPage(nextPageNum);
 
     document.getElementById('jump').onchange = (e) => {
       const num = parseInt(e.target.value);
-      if (allPages.includes(num)) {
+      if (allPageNumbers.includes(num)) {
         goToPage(num);
       } else {
-        alert(`Страница ${num} отсутствует.\nДоступные: ${allPages.join(', ')}`);
-        e.target.value = currentPage;
+        alert(`Страница ${num} отсутствует.\nДоступные: ${allPageNumbers.join(', ')}`);
+        e.target.value = currentPageNum;
       }
     };
 
     document.addEventListener('keydown', e => {
-      if (e.key === 'ArrowLeft' && prevPage !== null) goToPage(prevPage);
-      else if (e.key === 'ArrowRight' && nextPage !== null) goToPage(nextPage);
-      else if (e.key === 'Home' && allPages.length > 0) goToPage(allPages[0]);
-      else if (e.key === 'End' && allPages.length > 0) goToPage(allPages[allPages.length - 1]);
+      if (e.key === 'ArrowLeft' && prevPageNum !== null) goToPage(prevPageNum);
+      else if (e.key === 'ArrowRight' && nextPageNum !== null) goToPage(nextPageNum);
+      else if (e.key === 'Home' && allPageNumbers.length > 0) goToPage(allPageNumbers[0]);
+      else if (e.key === 'End' && allPageNumbers.length > 0) goToPage(allPageNumbers[allPageNumbers.length - 1]);
+    });
+
+    // ✅ Исправление гиперссылок внутри телетекста
+    document.addEventListener('DOMContentLoaded', () => {
+        const frame = document.querySelector('.teletext-frame');
+        if (frame) {
+            // Находим все ссылки внутри фрейма
+            const links = frame.querySelectorAll('a[href]');
+            links.forEach(link => {
+                const href = link.getAttribute('href');
+                // Проверяем, является ли href .html файлом в текущем каталоге
+                if (href && href.endsWith('.html')) {
+                    // Извлекаем номер страницы из href
+                    const match = href.match(/(\d+)\.html$/);
+                    if (match) {
+                        const pageNum = match[1];
+                        // Меняем href на внутренний маршрут
+                        link.href = `/page/${encodeURIComponent(currentPath)}/${pageNum}`;
+                        // Добавляем обработчик, чтобы не открывать в новом окне
+                        link.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            window.location.href = link.href;
+                        });
+                    }
+                }
+            });
+        }
     });
 
 
