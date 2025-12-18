@@ -61,8 +61,6 @@ const uploadFiles = multer({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
         filename: (req, file, cb) => {
             const cleanName = file.originalname
-                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
-                .replace(/\s+/g, '_');
             cb(null, `upload_${Date.now()}_${cleanName}`);
         }
     }),
@@ -167,52 +165,57 @@ app.get('/folder/*', async (req, res) => {
     const folders = items.filter(item => fs.statSync(path.join(fullPath, item)).isDirectory());
     const htmlFiles = items.filter(item => item.endsWith('.html'));
 
-    // Также передаём обычный список страниц под именем 'pages', чтобы не ломать другие части шаблона
-    const pages = htmlFiles.map(file => {
-        const pageStr = file.replace('.html', '');
-        const page = parseInt(pageStr, 10);
-        const hasThumb = fs.existsSync(path.join(fullPath, `${pageStr}.png`));
-        return { page, hasThumb };
-    }).filter(p => !isNaN(p.page) && p.page >= 100 && p.page <= 999);
+    // ✅ Определяем, является ли текущая папка "каналом" (содержит ',' или '&')
+    const isChannel = decodedPath.includes(',') || decodedPath.includes('&');
 
-    // ✅ Группировка страниц по годам (извлекаем из имени файла)
-    const pagesByYear = {};
-    htmlFiles.forEach(file => {
-        const pageStr = file.replace('.html', '');
-        const page = parseInt(pageStr, 10);
-        if (isNaN(page) || page < 100 || page > 999) return;
+    let groupedFolders = {};
+    let groupedPages = {};
 
-        // Ищем год в имени файла (например, "100_1995.html" -> 1995, "200_95.html" -> 1995, "300_2003.html" -> 2003)
-        let year = 0; // Если год не найден — будет 0
-        const yearMatch = file.match(/_(\d{2}|\d{4})\.html$/);
-        if (yearMatch) {
-            const yearPart = yearMatch[1];
-            if (yearPart.length === 4) {
-                year = parseInt(yearPart, 10); // 1995, 2003...
-            } else if (yearPart.length === 2) {
-                const num = parseInt(yearPart, 10);
-                // Превращаем 95 в 1995, 03 в 2003
-                year = num > 25 ? 1900 + num : 2000 + num; // Условно: 26-99 -> 19xx, 00-25 -> 20xx
+    if (isChannel) {
+        // ✅ Группировка подпапок по годам (для каналов)
+        const foldersByYear = {};
+        folders.forEach(folder => {
+            let year = 0; // Если год не найден — будет 0
+
+            // Ищем 4-значный или 2-значный год в конце имени папки (например, "1KANAL 01.12.2006" -> 2006)
+            const dateMatch = folder.match(/(\d{2}|\d{4})$/);
+            if (dateMatch) {
+                const yearPart = dateMatch[1];
+                if (yearPart.length === 4) {
+                    year = parseInt(yearPart, 10); // 1995, 2003...
+                } else if (yearPart.length === 2) {
+                    const num = parseInt(yearPart, 10);
+                    // Превращаем 95 в 1995, 03 в 2003
+                    year = num > 25 ? 1900 + num : 2000 + num; // Условно: 26-99 -> 19xx, 00-25 -> 20xx
+                }
             }
+
+            if (!foldersByYear[year]) {
+                foldersByYear[year] = [];
+            }
+            foldersByYear[year].push(folder);
+        });
+
+        // Сортируем годы (новые — вверху) и папки внутри года
+        const sortedYears = Object.keys(foldersByYear)
+            .map(y => parseInt(y, 10))
+            .sort((a, b) => b - a); // От новых к старым
+
+        groupedFolders = {};
+        sortedYears.forEach(year => {
+            if (year !== 0) { // Не добавляем "Без года" в список лет
+                groupedFolders[year] = foldersByYear[year].sort(); // По алфавиту
+            }
+        });
+
+        // ✅ Все папки без года (год == 0) — в одну секцию "Без года"
+        if (foldersByYear[0] && foldersByYear[0].length > 0) {
+            groupedFolders['0'] = foldersByYear[0].sort(); // Добавляем "Без года" как отдельную секцию
         }
-
-        const hasThumb = fs.existsSync(path.join(fullPath, `${pageStr}.png`));
-
-        if (!pagesByYear[year]) {
-            pagesByYear[year] = [];
-        }
-        pagesByYear[year].push({ page, hasThumb });
-    });
-
-    // Сортируем годы (новые — вверху) и страницы внутри года
-    const sortedYears = Object.keys(pagesByYear)
-        .map(y => parseInt(y, 10))
-        .sort((a, b) => b - a); // От новых к старым
-
-    const groupedPages = {};
-    sortedYears.forEach(year => {
-        groupedPages[year] = pagesByYear[year].sort((a, b) => a.page - b.page); // По возрастанию номера страницы
-    });
+    } else {
+        // ✅ Для стран — просто используем обычные подпапки
+        groupedFolders = {}; // Не используется
+    }
 
     const pathParts = decodedPath.split('/').filter(Boolean);
     const breadcrumb = pathParts.map((part, i) => ({ name: part, path: pathParts.slice(0, i + 1).join('/') }));
@@ -258,12 +261,14 @@ app.get('/folder/*', async (req, res) => {
         };
     });
 
+    // --- Шаг 4: Рендер шаблона ---
     res.render('folder', {
         folderName: path.basename(fullPath) || 'Телетекст',
         currentPath: decodedPath,
         folders,
-        groupedPages, // ✅ Передаём сгруппированные страницы (для отображения по годам)
-        pages,        // ✅ Передаём обычный список страниц (для подсчёта и др.)
+        groupedFolders, // ✅ Передаём сгруппированные подпапки
+        htmlFiles,      // ✅ Передаём список html-файлов
+        isChannel,     // ✅ Передаём флаг, что это канал
         breadcrumb,
         hasLogo: logoExists || logoExistsPng,
         logoUrl,
@@ -417,9 +422,9 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
                 } catch (renameErr) {
                     if (renameErr.code === 'EPERM' && i < maxRetries - 1) {
                         logAction('FOLDER_RENAME_RETRY', `${decodedPath}: попытка ${i + 1} из ${maxRetries} (EPERM)`);
-                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        await new Promise(resolve => setTimeout(resolve, 1000)); // Задержка 1 секунда
                     } else {
-                        throw renameErr;
+                        throw renameErr; // Прерываем цикл, если не EPERM или последняя попытка
                     }
                 }
             }
@@ -428,19 +433,21 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
                 throw new Error(`Не удалось переименовать после ${maxRetries} попыток`);
             }
 
-            finalPathAfterRename = path.join(path.dirname(decodedPath), newTitle).replace(/^\/+/, '');
+            // Обновляем finalPathAfterRename
+            finalPathAfterRename = path.join(path.dirname(decodedPath), newTitle).replace(/^\/+/, ''); // Убираем начальный слэш, если есть
 
         } catch (renameErr) {
             logAction('FOLDER_RENAME_ERROR', `${decodedPath}: ${renameErr.message}`);
+            // Проверяем, была ли ошибка EPERM
             if (renameErr.code === 'EPERM') {
-                return res.status(500).render('error', { message: `Ошибка переименования: операция запрещена. Убедитесь, что папка не используется другим процессом.` });
+                return res.status(500).render('error', { message: `Ошибка переименования: операция запрещена. Убедитесь, что папка не используется другим процессом (антивирус, проводник и т.д.). Попробуйте закрыть все программы, работающие с этой папкой, и сохранить снова.` });
             } else {
-                return res.status(500).render('error', { message: `Ошибка переименования: ${renameErr.message}` });
+                return res.status(500).render('error', { message: `Ошибка переименования папки: ${renameErr.message}` });
             }
         }
     }
 
-    // --- Шаг 2: Обновление файлов в новой (или старой) папке ---
+    // --- Шаг 2: Обновление файлов title.txt и description.txt в новой (или старой) папке ---
     const finalFullDirPath = path.join(__dirname, 'teletext', finalPathAfterRename);
 
     // Обновление title.txt
@@ -450,6 +457,7 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
         logAction('TITLE_SAVED', `${newTitle} -> ${finalPathAfterRename}`);
     } catch (err) {
         logAction('TITLE_SAVE_ERROR', `${finalPathAfterRename}: ${err.message}`);
+        // Продолжаем, даже если title не сохранился
     }
 
     // Обновление description.txt
@@ -460,6 +468,7 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
             logAction('DESC_SAVED', `${newDescription.substring(0, 20)}... -> ${finalPathAfterRename}`);
         } catch (err) {
             logAction('DESC_SAVE_ERROR', `${finalPathAfterRename}: ${err.message}`);
+            // Продолжаем, даже если description не сохранился
         }
     } else {
         const descFile = path.join(finalFullDirPath, 'description.txt');
@@ -469,6 +478,7 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
                 logAction('DESC_DELETED', `description.txt удален из ${finalPathAfterRename}`);
             } catch (err) {
                 logAction('DESC_DELETE_ERROR', `${finalPathAfterRename}: ${err.message}`);
+                // Продолжаем, даже если description не удалён
             }
         }
     }
@@ -483,10 +493,12 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
             logAction('LOGO_UPLOADED', `${targetName} -> ${finalPathAfterRename}`);
         } catch (err) {
             logAction('LOGO_UPLOAD_ERROR', `${finalPathAfterRename}: ${err.message}`);
+            // Продолжаем, даже если логотип не загрузился
         }
     }
 
     // --- Шаг 4: Редирект ---
+    // Редиректим на страницу папки (новую, если переименовали)
     res.redirect(`/folder/${finalPathAfterRename}`);
 });
 
@@ -594,8 +606,6 @@ app.post('/create-folder/*', (req, res) => {
     }
 
     const cleanName = name.trim()
-        .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
-        .replace(/\s+/g, '_');
 
     const fullPath = path.join(__dirname, 'teletext', requestedPath);
     if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
@@ -642,6 +652,7 @@ app.post('/delete-item/*', (req, res) => {
             fs.unlinkSync(fullPath);
             logAction('FILE_DELETED', `teletext/${requestedPath ? requestedPath + '/' : ''}${cleanName}`);
         } else if (type === 'folder') {
+            // Удаляем папку рекурсивно
             fs.rmSync(fullPath, { recursive: true, force: true });
             logAction('FOLDER_DELETED', `teletext/${requestedPath ? requestedPath + '/' : ''}${cleanName}`);
         }
@@ -686,10 +697,11 @@ app.post('/rename-item/*', (req, res) => {
             } catch (renameErr) {
                 if (renameErr.code === 'EPERM' && i < maxRetries - 1) {
                     logAction('ITEM_RENAME_RETRY', `${requestedPath}/${cleanOldName}: попытка ${i + 1} из ${maxRetries} (EPERM)`);
+                    // Задержка перед повторной попыткой
                     const start = Date.now();
                     while (Date.now() - start < 1000);
                 } else {
-                    throw renameErr;
+                    throw renameErr; // Прерываем цикл, если не EPERM или последняя попытка
                 }
             }
         }
@@ -718,14 +730,9 @@ app.post('/move-item/*', (req, res) => {
         return res.status(400).json({ error: 'Некорректные данные' });
     }
 
-    const finalTargetPath = targetPath ? path.join(targetPath) : requestedPath;
-    if (!isValidPath(finalTargetPath)) {
-        return res.status(400).json({ error: 'Недопустимый путь назначения' });
-    }
-
     const cleanItemName = path.basename(itemName);
     const sourcePath = path.join(__dirname, 'teletext', requestedPath, cleanItemName);
-    const targetDirPath = path.join(__dirname, 'teletext', finalTargetPath);
+    const targetDirPath = path.join(__dirname, 'teletext', targetPath || requestedPath); // Если targetPath пустой — перемещаем в ту же папку
     const targetItemPath = path.join(targetDirPath, cleanItemName);
 
     if (!fs.existsSync(sourcePath)) {
@@ -745,7 +752,7 @@ app.post('/move-item/*', (req, res) => {
         logAction('ITEM_MOVED', `${type} ${sourcePath} -> ${targetItemPath}`);
         res.json({ success: true });
     } catch (err) {
-        logAction('ITEM_MOVE_ERROR', `${requestedPath}/${cleanItemName} -> ${finalTargetPath}: ${err.message}`);
+        logAction('ITEM_MOVE_ERROR', `${requestedPath}/${cleanItemName} -> ${targetItemPath}: ${err.message}`);
         if (err.code === 'EPERM') {
             return res.status(500).json({ error: `Ошибка перемещения: операция запрещена. Убедитесь, что объект не используется другим процессом.` });
         } else {
@@ -782,8 +789,6 @@ app.post('/upload/*', uploadFiles.any(), async (req, res) => {
             }
 
             targetName = targetName
-                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
-                .replace(/\s+/g, '_');
 
             const targetPath = path.join(fullPath, targetName);
 
@@ -807,7 +812,6 @@ app.post('/upload/*', uploadFiles.any(), async (req, res) => {
 app.use((req, res) => {
     res.status(404).render('error', { message: 'Страница не найдена' });
 });
-
 
 
 app.listen(port, () => {
