@@ -287,7 +287,7 @@
       line-height: 1.2;
     }
 
-    /* Заголовок "Подпапки (по годам)" */
+
     .subfolders-by-year-header {
       background: var(--card-bg);
       border: 1px solid var(--accent);
@@ -341,12 +341,10 @@
         </div>
       </div>
 
-      <!-- ✅ Если это канал (содержит ',' или '&') — показываем подпапки, сгруппированные по годам -->
+
        <% if (groupedFolders && Object.keys(groupedFolders).length > 0) { %>
         <section class="thumbs-grid">
           <div class="subfolders-by-year-header">
-            <img src="https://tele.assunayuuki.ru/teletext/images/folder.png" alt="Подпапки" style="height:20px; vertical-align: middle; margin-right:8px;">
-            Подпапки (по годам)
           </div>
           <% Object.entries(groupedFolders).forEach(([year, foldersInYear]) => { %>
             <div class="year-section">
