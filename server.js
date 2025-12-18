@@ -32,7 +32,7 @@ app.use((req, res, next) => {
     res.setHeader(
         'Content-Security-Policy',
         "default-src 'self'; " +
-        "img-src 'self' https://cdn.discordapp.com https://tele.assunayuuki.ru/; " +
+        "img-src 'self' https://cdn.discordapp.com https://okgamer.ru/uploads/fotos/; " +
         "style-src 'self' 'unsafe-inline'; " +
         "script-src 'self' 'unsafe-inline' https://mc.yandex.ru; " +
         "font-src 'self';"
@@ -166,6 +166,8 @@ app.get('/folder/*', async (req, res) => {
     const items = fs.readdirSync(fullPath);
     const folders = items.filter(item => fs.statSync(path.join(fullPath, item)).isDirectory());
     const htmlFiles = items.filter(item => item.endsWith('.html'));
+
+    // Также передаём обычный список страниц под именем 'pages', чтобы не ломать другие части шаблона
     const pages = htmlFiles.map(file => {
         const pageStr = file.replace('.html', '');
         const page = parseInt(pageStr, 10);
@@ -173,12 +175,44 @@ app.get('/folder/*', async (req, res) => {
         return { page, hasThumb };
     }).filter(p => !isNaN(p.page) && p.page >= 100 && p.page <= 999);
 
-    // ✅ Сортировка по дате модификации (новые — вверху)
-    const pagesWithMtime = pages.map(p => {
-        const filePath = path.join(fullPath, `${p.page}.html`);
-        const mtime = fs.statSync(filePath).mtime;
-        return { ...p, mtime };
-    }).sort((a, b) => b.mtime - a.mtime);
+    // ✅ Группировка страниц по годам (извлекаем из имени файла)
+    const pagesByYear = {};
+    htmlFiles.forEach(file => {
+        const pageStr = file.replace('.html', '');
+        const page = parseInt(pageStr, 10);
+        if (isNaN(page) || page < 100 || page > 999) return;
+
+        // Ищем год в имени файла (например, "100_1995.html" -> 1995, "200_95.html" -> 1995, "300_2003.html" -> 2003)
+        let year = 0; // Если год не найден — будет 0
+        const yearMatch = file.match(/_(\d{2}|\d{4})\.html$/);
+        if (yearMatch) {
+            const yearPart = yearMatch[1];
+            if (yearPart.length === 4) {
+                year = parseInt(yearPart, 10); // 1995, 2003...
+            } else if (yearPart.length === 2) {
+                const num = parseInt(yearPart, 10);
+                // Превращаем 95 в 1995, 03 в 2003
+                year = num > 25 ? 1900 + num : 2000 + num; // Условно: 26-99 -> 19xx, 00-25 -> 20xx
+            }
+        }
+
+        const hasThumb = fs.existsSync(path.join(fullPath, `${pageStr}.png`));
+
+        if (!pagesByYear[year]) {
+            pagesByYear[year] = [];
+        }
+        pagesByYear[year].push({ page, hasThumb });
+    });
+
+    // Сортируем годы (новые — вверху) и страницы внутри года
+    const sortedYears = Object.keys(pagesByYear)
+        .map(y => parseInt(y, 10))
+        .sort((a, b) => b - a); // От новых к старым
+
+    const groupedPages = {};
+    sortedYears.forEach(year => {
+        groupedPages[year] = pagesByYear[year].sort((a, b) => a.page - b.page); // По возрастанию номера страницы
+    });
 
     const pathParts = decodedPath.split('/').filter(Boolean);
     const breadcrumb = pathParts.map((part, i) => ({ name: part, path: pathParts.slice(0, i + 1).join('/') }));
@@ -228,7 +262,8 @@ app.get('/folder/*', async (req, res) => {
         folderName: path.basename(fullPath) || 'Телетекст',
         currentPath: decodedPath,
         folders,
-        pages: pagesWithMtime, // ✅ Используем отсортированный массив
+        groupedPages, // ✅ Передаём сгруппированные страницы (для отображения по годам)
+        pages,        // ✅ Передаём обычный список страниц (для подсчёта и др.)
         breadcrumb,
         hasLogo: logoExists || logoExistsPng,
         logoUrl,
@@ -357,7 +392,7 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
         return res.redirect(`/edit-card/${decodedPath}`);
     }
 
-    // --- Шаг 1: Переименование папки в название канала ---
+    // --- Шаг 1: Переименование папки ---
     let finalPathAfterRename = decodedPath; // Путь после возможного переименования
 
     if (newTitle !== path.basename(decodedPath)) {
@@ -382,32 +417,30 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
                 } catch (renameErr) {
                     if (renameErr.code === 'EPERM' && i < maxRetries - 1) {
                         logAction('FOLDER_RENAME_RETRY', `${decodedPath}: попытка ${i + 1} из ${maxRetries} (EPERM)`);
-                        await new Promise(resolve => setTimeout(resolve, 1000)); // Задержка 1 секунда
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                     } else {
-                        throw renameErr; // Прерываем цикл, если не EPERM или последняя попытка
+                        throw renameErr;
                     }
                 }
             }
 
             if (!success) {
-                throw new Error(`Не удалось переименовать папку после ${maxRetries} попыток`);
+                throw new Error(`Не удалось переименовать после ${maxRetries} попыток`);
             }
 
-            // Обновляем finalPathAfterRename
-            finalPathAfterRename = path.join(path.dirname(decodedPath), newTitle).replace(/^\/+/, ''); // Убираем начальный слэш, если есть
+            finalPathAfterRename = path.join(path.dirname(decodedPath), newTitle).replace(/^\/+/, '');
 
         } catch (renameErr) {
             logAction('FOLDER_RENAME_ERROR', `${decodedPath}: ${renameErr.message}`);
-            // Проверяем, была ли ошибка EPERM
             if (renameErr.code === 'EPERM') {
-                return res.status(500).render('error', { message: `Ошибка переименования: операция запрещена. Убедитесь, что папка не используется другим процессом (антивирус, проводник и т.д.). Попробуйте закрыть все программы, работающие с этой папкой, и сохранить снова.` });
+                return res.status(500).render('error', { message: `Ошибка переименования: операция запрещена. Убедитесь, что папка не используется другим процессом.` });
             } else {
-                return res.status(500).render('error', { message: `Ошибка переименования папки: ${renameErr.message}` });
+                return res.status(500).render('error', { message: `Ошибка переименования: ${renameErr.message}` });
             }
         }
     }
 
-    // --- Шаг 2: Обновление файлов title.txt и description.txt в новой (или старой) папке ---
+    // --- Шаг 2: Обновление файлов в новой (или старой) папке ---
     const finalFullDirPath = path.join(__dirname, 'teletext', finalPathAfterRename);
 
     // Обновление title.txt
@@ -417,7 +450,6 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
         logAction('TITLE_SAVED', `${newTitle} -> ${finalPathAfterRename}`);
     } catch (err) {
         logAction('TITLE_SAVE_ERROR', `${finalPathAfterRename}: ${err.message}`);
-        // Продолжаем, даже если title не сохранился
     }
 
     // Обновление description.txt
@@ -428,7 +460,6 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
             logAction('DESC_SAVED', `${newDescription.substring(0, 20)}... -> ${finalPathAfterRename}`);
         } catch (err) {
             logAction('DESC_SAVE_ERROR', `${finalPathAfterRename}: ${err.message}`);
-            // Продолжаем, даже если description не сохранился
         }
     } else {
         const descFile = path.join(finalFullDirPath, 'description.txt');
@@ -438,7 +469,6 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
                 logAction('DESC_DELETED', `description.txt удален из ${finalPathAfterRename}`);
             } catch (err) {
                 logAction('DESC_DELETE_ERROR', `${finalPathAfterRename}: ${err.message}`);
-                // Продолжаем, даже если description не удалён
             }
         }
     }
@@ -453,12 +483,10 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
             logAction('LOGO_UPLOADED', `${targetName} -> ${finalPathAfterRename}`);
         } catch (err) {
             logAction('LOGO_UPLOAD_ERROR', `${finalPathAfterRename}: ${err.message}`);
-            // Продолжаем, даже если логотип не загрузился
         }
     }
 
     // --- Шаг 4: Редирект ---
-    // Редиректим на страницу папки (новую, если переименовали)
     res.redirect(`/folder/${finalPathAfterRename}`);
 });
 
@@ -614,7 +642,6 @@ app.post('/delete-item/*', (req, res) => {
             fs.unlinkSync(fullPath);
             logAction('FILE_DELETED', `teletext/${requestedPath ? requestedPath + '/' : ''}${cleanName}`);
         } else if (type === 'folder') {
-            // Удаляем папку рекурсивно
             fs.rmSync(fullPath, { recursive: true, force: true });
             logAction('FOLDER_DELETED', `teletext/${requestedPath ? requestedPath + '/' : ''}${cleanName}`);
         }
@@ -659,11 +686,10 @@ app.post('/rename-item/*', (req, res) => {
             } catch (renameErr) {
                 if (renameErr.code === 'EPERM' && i < maxRetries - 1) {
                     logAction('ITEM_RENAME_RETRY', `${requestedPath}/${cleanOldName}: попытка ${i + 1} из ${maxRetries} (EPERM)`);
-                    // Задержка перед повторной попыткой
                     const start = Date.now();
                     while (Date.now() - start < 1000);
                 } else {
-                    throw renameErr; // Прерываем цикл, если не EPERM или последняя попытка
+                    throw renameErr;
                 }
             }
         }
@@ -692,7 +718,6 @@ app.post('/move-item/*', (req, res) => {
         return res.status(400).json({ error: 'Некорректные данные' });
     }
 
-    // Если targetPath пустой, значит перемещаем в корень (currentPath)
     const finalTargetPath = targetPath ? path.join(targetPath) : requestedPath;
     if (!isValidPath(finalTargetPath)) {
         return res.status(400).json({ error: 'Недопустимый путь назначения' });
@@ -716,7 +741,6 @@ app.post('/move-item/*', (req, res) => {
     }
 
     try {
-        // fs.renameSync может перемещать как файлы, так и папки
         fs.renameSync(sourcePath, targetItemPath);
         logAction('ITEM_MOVED', `${type} ${sourcePath} -> ${targetItemPath}`);
         res.json({ success: true });
@@ -743,7 +767,6 @@ app.post('/upload/*', uploadFiles.any(), async (req, res) => {
         return res.status(404).json({ error: 'Папка не найдена' });
     }
 
-    // req.files может быть undefined, если не переданы файлы
     if (!req.files || req.files.length === 0) {
         return res.status(400).json({ error: 'Нет файлов для загрузки' });
     }
@@ -779,8 +802,6 @@ app.post('/upload/*', uploadFiles.any(), async (req, res) => {
 
     res.json({ success: true, saved });
 });
-
-
 
 // 404
 app.use((req, res) => {
