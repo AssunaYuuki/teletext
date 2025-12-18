@@ -102,7 +102,7 @@ async function generateThumbnail(htmlPath, pngPath) {
                 '--disable-gpu',
                 '--disable-web-security'
             ],
-            defaultViewport: { width: 200, height: 200 }
+            defaultViewport: { width: 250, height: 250 }
         });
         const page = await browser.newPage();
         await page.goto(`file://${htmlPath}`, { waitUntil: 'networkidle2', timeout: 15000 });
