@@ -114,11 +114,11 @@ async function generateThumbnail(htmlPath, pngPath) {
         const sharp = require('sharp');
         const buffer = fs.readFileSync(pngPath);
         const resizedBuffer = await sharp(buffer)
-            .resize(200, 200, { fit: 'cover', position: 'center' }) // Обрезаем по центру
+            .resize(250, 250, { fit: 'cover', position: 'center' }) // Обрезаем по центру
             .toBuffer();
         fs.writeFileSync(pngPath, resizedBuffer);
 
-        logAction('THUMBNAIL_GENERATED_200x200', pngPath);
+        logAction('THUMBNAIL_GENERATED_250x250', pngPath);
 
     } catch (err) {
         throw err;
