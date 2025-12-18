@@ -166,8 +166,6 @@
       padding: 20px;
       max-width: 600px;
       width: 90%;
-      max-height: 70vh;
-      overflow: auto;
       box-shadow: 0 0 20px var(--glow);
       position: relative;
     }
@@ -231,65 +229,26 @@
       color: var(--bg);
     }
 
-    /* Древовидный селектор папок */
-    .folder-tree {
+    /* Стили для модального окна перемещения */
+    .move-modal-body {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .move-modal-input {
+      width: 100%;
+      padding: 8px;
       background: var(--hover-bg);
       border: 1px solid var(--accent);
+      color: var(--fg);
+      font-family: var(--font-mono);
       border-radius: 4px;
-      padding: 10px;
-      max-height: 300px;
-      overflow-y: auto;
-      margin-top: 8px;
     }
 
-    .folder-node {
-      list-style-type: none;
-      padding-left: 20px;
-      margin: 0;
-    }
-
-    .folder-node ul {
-      padding-left: 20px;
-    }
-
-    .folder-node-item {
-      margin: 2px 0;
-    }
-
-    .folder-node-toggle {
-      cursor: pointer;
-      background: none;
-      border: none;
-      color: var(--accent);
-      padding: 2px;
-      font-size: 0.9rem;
-    }
-
-    .folder-node-name {
-      cursor: pointer;
-      padding: 2px 4px;
-      border-radius: 2px;
-    }
-
-    .folder-node-name:hover {
-      background: rgba(0, 255, 153, 0.1);
-    }
-
-    .folder-node-name.selected {
-      background: rgba(0, 255, 153, 0.2);
-      color: #00ffaa;
-    }
-
-    .folder-node-icon {
-      margin-right: 4px;
-      font-size: 0.8rem;
-    }
-
-    .current-location {
-      font-size: 0.9rem;
-      color: var(--accent);
-      margin-top: 5px;
-      font-style: italic;
+    .move-modal-info {
+      font-size: 0.85rem;
+      opacity: 0.7;
     }
   </style>
 </head>
@@ -319,6 +278,7 @@
       <button onclick="createFolder()">➕ Создать папку</button>
       <input type="file" id="file-input" multiple directory webkitdirectory accept=".html,.png,.svg,.txt,.css,.js,.json,.jpg,.jpeg,.gif,.webp" />
       <button onclick="document.getElementById('file-input').click()">⬆️ Загрузить файлы/папки</button>
+      <button onclick="pasteItem()" id="paste-btn" style="display:none;">📋 Вставить</button>
     </div>
 
     <div id="drop-zone" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);" ondragleave="dragLeaveHandler(event);">
@@ -342,7 +302,7 @@
         <div class="item-card folder" data-name="<%= folder.name %>" data-type="folder">
           <div class="item-actions">
             <button title="Переименовать папку" onclick="openRenameModal('<%= folder.name %>', 'folder')">✏️</button>
-            <button title="Переместить папку" onclick="openMoveModal('<%= folder.name %>', 'folder')">🚚</button>
+            <button title="Вырезать папку" onclick="cutItem('<%= folder.name %>', 'folder')">✂️</button>
             <button title="Удалить папку" onclick="deleteItem('<%= folder.name %>', 'folder')">✕</button>
           </div>
           <a href="/manager/<%= encodeURIComponent(folder.path) %>" style="display:block; text-decoration:none; color:inherit;">
@@ -357,7 +317,7 @@
         <div class="item-card file" data-name="<%= file.name %>" data-type="file">
           <div class="item-actions">
             <button title="Переименовать файл" onclick="openRenameModal('<%= file.name %>', 'file')">✏️</button>
-            <button title="Переместить файл" onclick="openMoveModal('<%= file.name %>', 'file')">🚚</button>
+            <button title="Вырезать файл" onclick="cutItem('<%= file.name %>', 'file')">✂️</button>
             <button title="Удалить файл" onclick="deleteItem('<%= file.name %>', 'file')">✕</button>
           </div>
           <div class="item-preview">
@@ -392,7 +352,7 @@
     </div>
   </div>
 
-  <!-- Модальное окно перемещения -->
+  <!-- Модальное окно перемещения (вставка) -->
   <div id="move-modal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -400,11 +360,11 @@
         <span class="close" onclick="closeModal('move-modal')">&times;</span>
       </div>
       <div class="modal-body">
-        <p>Выберите папку для перемещения <strong id="move-target-name"></strong>:</p>
-        <div class="folder-tree" id="folder-tree">
-          <!-- Дерево папок будет загружено здесь -->
+        <div class="move-modal-body">
+          <p>Выберите папку для перемещения <strong id="move-target-name"></strong>:</p>
+          <input type="text" id="move-target-input" class="move-modal-input" placeholder="Введите путь или выберите из списка" readonly>
+          <div class="move-modal-info">Выбранная папка: <span id="selected-folder-path">(корень)</span></div>
         </div>
-        <div class="current-location" id="current-location">Выбранная папка: (корень)</div>
       </div>
       <div class="modal-footer">
         <button class="btn-cancel" onclick="closeModal('move-modal')">Отмена</button>
@@ -421,80 +381,7 @@
     const currentPath = `<%= currentPath %>`;
     let currentOperationTarget = null;
     let currentOperationType = null;
-    let selectedMoveTargetPath = null; // Хранит выбранный путь для перемещения
-
-    // Функция для загрузки дерева папок
-    async function loadFolderTree() {
-        try {
-            const res = await fetch(`/manager/tree-folders/${encodeURIComponent(currentPath)}`);
-            if (res.ok) {
-                const tree = await res.json();
-                const container = document.getElementById('folder-tree');
-                container.innerHTML = '';
-                const ul = document.createElement('ul');
-                ul.className = 'folder-node';
-                buildFolderTree(tree, ul);
-                container.appendChild(ul);
-            } else {
-                console.error('Ошибка загрузки дерева папок');
-            }
-        } catch (err) {
-            console.error('Ошибка сети при загрузке дерева папок:', err);
-        }
-    }
-
-    function buildFolderTree(node, parentElement) {
-        node.forEach(folder => {
-            const li = document.createElement('li');
-            li.className = 'folder-node-item';
-
-            const toggleSpan = document.createElement('span');
-            toggleSpan.className = 'folder-node-toggle';
-            toggleSpan.innerHTML = folder.children && folder.children.length > 0 ? '▶ ' : '• ';
-            toggleSpan.onclick = (e) => {
-                e.stopPropagation();
-                const ulChild = li.querySelector('ul');
-                if (ulChild) {
-                    if (ulChild.style.display === 'none') {
-                        ulChild.style.display = 'block';
-                        toggleSpan.innerHTML = '▼ ';
-                    } else {
-                        ulChild.style.display = 'none';
-                        toggleSpan.innerHTML = '▶ ';
-                    }
-                }
-            };
-
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'folder-node-name';
-            nameSpan.innerHTML = `<span class="folder-node-icon">📁</span>${folder.name}`;
-            nameSpan.onclick = () => {
-                // Снимаем выделение с других
-                document.querySelectorAll('.folder-node-name.selected').forEach(el => {
-                    el.classList.remove('selected');
-                });
-                // Выделяем текущий
-                nameSpan.classList.add('selected');
-                // Сохраняем путь
-                selectedMoveTargetPath = folder.path;
-                // Обновляем отображение
-                document.getElementById('current-location').textContent = `Выбранная папка: ${folder.path || '(корень)'} `;
-            };
-
-            li.appendChild(toggleSpan);
-            li.appendChild(nameSpan);
-
-            if (folder.children && folder.children.length > 0) {
-                const childUl = document.createElement('ul');
-                childUl.className = 'folder-node';
-                childUl.style.display = 'none'; // Скрыт по умолчанию
-                buildFolderTree(folder.children, childUl);
-                li.appendChild(childUl);
-            }
-
-            parentElement.appendChild(li);
-        });
-    }
+    let cutItemData = null; // Хранит данные вырезанного элемента
 
     function openRenameModal(name, type) {
         currentOperationTarget = name;
@@ -508,9 +395,8 @@
         currentOperationTarget = name;
         currentOperationType = type;
         document.getElementById('move-target-name').textContent = name;
-        selectedMoveTargetPath = null; // Сброс при открытии
-        document.getElementById('current-location').textContent = 'Выбранная папка: (корень)';
-        loadFolderTree(); // Загружаем дерево перед открытием
+        document.getElementById('move-target-input').value = '';
+        document.getElementById('selected-folder-path').textContent = '(корень)';
         document.getElementById('move-modal').style.display = 'flex';
     }
 
@@ -518,7 +404,7 @@
         document.getElementById(modalId).style.display = 'none';
         currentOperationTarget = null;
         currentOperationType = null;
-        selectedMoveTargetPath = null;
+        cutItemData = null;
     }
 
     async function performRename() {
@@ -547,24 +433,37 @@
         }
     }
 
-    async function performMove() {
-        if (!currentOperationTarget || !currentOperationType) {
-            alert('Выберите папку назначения.');
+    async function cutItem(name, type) {
+        // Сохраняем данные в localStorage
+        cutItemData = {
+            name: name,
+            type: type,
+            sourcePath: currentPath
+        };
+        alert(`✅ Элемент "${name}" вырезан. Перейдите в нужную папку и нажмите "Вставить".`);
+    }
+
+    async function pasteItem() {
+        if (!cutItemData) {
+            alert('Нет вырезанного элемента!');
             return;
         }
 
-        // Если не выбрана папка, то перемещаем в корень (currentPath)
-        const targetPath = selectedMoveTargetPath !== null ? selectedMoveTargetPath : '';
+        const targetPath = currentPath; // Вставляем в текущую папку
+        const itemName = cutItemData.name;
+        const itemType = cutItemData.type;
+        const sourcePath = cutItemData.sourcePath;
 
         try {
-            const res = await fetch('/move-item/' + encodeURIComponent(currentPath), {
+            const res = await fetch('/move-item/' + encodeURIComponent(sourcePath), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ itemName: currentOperationTarget, targetPath: targetPath, type: currentOperationType })
+                body: JSON.stringify({ itemName: itemName, targetPath: targetPath, type: itemType })
             });
 
             if (res.ok) {
-                closeModal('move-modal');
+                alert('✅ Элемент перемещён!');
+                cutItemData = null; // Очищаем буфер
                 location.reload();
             } else {
                 const data = await res.json();

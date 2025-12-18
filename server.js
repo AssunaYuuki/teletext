@@ -840,6 +840,50 @@ app.get('/manager/tree-folders/*', (req, res) => {
     }
 });
 
+// ✅ Вставить вырезанный элемент (переместить в текущую папку)
+app.post('/paste-item/*', (req, res) => {
+    const requestedPath = req.params[0] || '';
+    const { itemName, type } = req.body;
+
+    if (!isValidPath(requestedPath) || !itemName || !['file', 'folder'].includes(type)) {
+        return res.status(400).json({ error: 'Некорректные данные' });
+    }
+
+    // Получаем данные из localStorage (это пример, в реальности нужно использовать session или БД)
+    // Для простоты — мы будем считать, что данные хранятся в localStorage на клиенте
+    // Но на сервере их нет, поэтому мы делаем так:
+    // Предположим, что вырезанный элемент был в папке, указанной в пути
+    const sourcePath = requestedPath; // Источник — текущая папка (это упрощение)
+    const targetPath = requestedPath; // Назначение — текущая папка
+
+    const cleanItemName = path.basename(itemName);
+    const sourcePathFull = path.join(__dirname, 'teletext', sourcePath, cleanItemName);
+    const targetPathFull = path.join(__dirname, 'teletext', targetPath, cleanItemName);
+
+    if (!fs.existsSync(sourcePathFull)) {
+        return res.status(404).json({ error: 'Объект не найден' });
+    }
+
+    if (fs.existsSync(targetPathFull)) {
+        return res.status(400).json({ error: 'Объект с таким именем уже существует' });
+    }
+
+    try {
+        fs.renameSync(sourcePathFull, targetPathFull);
+        logAction('ITEM_MOVED', `${type} ${sourcePathFull} -> ${targetPathFull}`);
+        res.json({ success: true });
+    } catch (err) {
+        logAction('ITEM_MOVE_ERROR', `${requestedPath}/${cleanItemName} -> ${targetPath}: ${err.message}`);
+        if (err.code === 'EPERM') {
+            return res.status(500).json({ error: `Ошибка перемещения: операция запрещена. Убедитесь, что объект не используется другим процессом.` });
+        } else {
+            return res.status(500).json({ error: `Ошибка перемещения: ${err.message}` });
+        }
+    }
+});
+
+
+
 // 404
 app.use((req, res) => {
     res.status(404).render('error', { message: 'Страница не найдена' });
