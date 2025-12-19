@@ -87,7 +87,7 @@ function isValidPath(p) {
     return !p.includes('..') && !p.startsWith('/') && !p.includes(':') && !p.includes('\\') && !p.includes('\0');
 }
 
-// Генерация превью (250x250)
+// ✅ Генерация превью (250x250) с оптимизацией
 async function generateThumbnail(htmlPath, pngPath) {
     let browser;
     try {
@@ -106,13 +106,14 @@ async function generateThumbnail(htmlPath, pngPath) {
         await page.goto(`file://${htmlPath}`, { waitUntil: 'networkidle2', timeout: 15000 });
         await page.screenshot({ path: pngPath, type: 'png', fullPage: true });
 
-        // ✅ Масштабируем до 250x250 через sharp
+        // ✅ Масштабируем и оптимизируем PNG через sharp
         const buffer = fs.readFileSync(pngPath);
         const resizedBuffer = await sharp(buffer)
             .resize(250, 250, { fit: 'cover', position: 'center' })
+            .png({ quality: 80, palette: true, dither: 0.5 }) // Уменьшаем вес
             .toBuffer();
         fs.writeFileSync(pngPath, resizedBuffer);
-        logAction('THUMBNAIL_GENERATED_250x250', pngPath);
+        logAction('THUMBNAIL_GENERATED_250x250_OPTIMIZED', pngPath);
 
     } catch (err) {
         throw err;
