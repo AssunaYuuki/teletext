@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Критично для мобильных -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= folderName %> — Страницы</title>
   <link rel="stylesheet" href="/global.css">
   <style>
@@ -19,10 +19,8 @@
 
     .content-wrapper {
       width: 100%;
-      max-width: 1000px; /* Максимальная ширина для больших экранов */
+      max-width: 1000px;
       margin: 0 auto;
-      padding: 0 10px; /* Добавляем отступы по бокам */
-      box-sizing: border-box;
     }
 
     .header {
@@ -37,14 +35,12 @@
       margin: 0;
       font-size: 2rem;
       text-shadow: 0 0 8px rgba(0, 204, 102, 0.6);
-      word-wrap: break-word; /* Позволяет разбивать длинные названия */
     }
 
     .breadcrumb {
       font-size: 0.9rem;
       opacity: 0.7;
       margin-top: 5px;
-      word-wrap: break-word; /* Позволяет разбивать длинные пути */
     }
 
     .breadcrumb a {
@@ -56,15 +52,37 @@
     }
 
     .grid {
-      /* Стили для сетки уже определены в global.css */
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+      margin-top: 10px;
     }
 
     .card {
-      /* Стили для карточки уже определены в global.css */
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      text-decoration: none;
+      color: var(--fg);
+      transition: all 0.2s ease;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 4px 12px rgba(0, 255, 136, 0.2);
+      border-color: #00ffaa;
     }
 
     .edit-btn-wrapper {
-      /* Стили для кнопки редактирования уже определены в глобальном CSS или останутся здесь */
       position: absolute;
       top: 4px;
       right: 4px;
@@ -101,11 +119,25 @@
     }
 
     .thumbs-grid .grid {
-      /* Стили для сетки превьюшек уже определены в global.css */
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     }
 
     .thumb-item {
-      /* Стили для элемента превьюшки уже определены в global.css */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 6px;
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      text-decoration: none;
+      color: var(--fg);
+    }
+
+    .thumb-item img {
+      width: 100%;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 3px;
     }
 
     /* Значок информации */
@@ -482,7 +514,7 @@
             <% pages.forEach(item => { %>
               <a href="/page/<%= encodeURIComponent(currentPath) %>/<%= item.page %>" class="thumb-item">
                 <% if (item.hasThumb) { %>
-                  <img src="<%= `/teletext/${currentPath}/${item.page}.png` %>?t=<%= Date.now() %>" alt="Стр. <%= item.page %>" onerror="this.src='/teletext/images/no-preview.png  '; this.alt='Нет превью';">
+                                            <img src="<%= `/teletext/${currentPath}/${item.page}.png` %>?t=<%= Date.now() %>" alt="Стр. <%= item.page %>" onerror="this.src='https://tele.assunayuuki.ru/teletext/images/no-preview.png'; this.alt='Нет превью';">
                 <% } else { %>
                   <div style="height:80px; width:100%; background:#0a220a; display:flex; align-items:center; justify-content:center; color:#00ff88; font-size:1.1rem; font-weight:bold;">
                     <%= item.page %>
@@ -500,14 +532,14 @@
       <% } %>
 
       <footer style="margin-top: 30px; text-align: center; font-size: 0.85rem; opacity: 0.7;">
-        <a href="https://notepad-plus-plus.org/    "><img src="https://tele.assunayuuki.ru/button_npp.png    " alt="Notepad++" /></a>
-        <a href="https://galagen.net/    "><img src="https://tele.assunayuuki.ru/touhou.jpg    " alt="Touhou" /></a>
-        <a href="https://en.wikipedia.org/wiki/Popotan    "><img src="https://tele.assunayuuki.ru/caramelldansen.gif    " alt="Caramelldansen" /></a>
-        <a href="https://archive.org/    "><img src="https://tele.assunayuuki.ru/archive.gif    " alt="Archive" /></a>
-        <a href="#"><img src="https://tele.assunayuuki.ru/ie.gif    " alt="IE" /></a>
-        <a href="#"><img src="https://tele.assunayuuki.ru/built_with_amiga02.gif    " alt="Amiga" /></a>
-        <a href="#"><img src="https://tele.assunayuuki.ru/c64ik.gif    " alt="C64" /></a>
-        <a href="#"><img src="https://tele.assunayuuki.ru/css3.gif    " alt="сss" /></a>
+        <a href="https://notepad-plus-plus.org/  "><img src="https://tele.assunayuuki.ru/button_npp.png  " alt="Notepad++" /></a>
+        <a href="https://galagen.net/  "><img src="https://tele.assunayuuki.ru/touhou.jpg  " alt="Touhou" /></a>
+        <a href="https://en.wikipedia.org/wiki/Popotan  "><img src="https://tele.assunayuuki.ru/caramelldansen.gif  " alt="Caramelldansen" /></a>
+        <a href="https://archive.org/  "><img src="https://tele.assunayuuki.ru/archive.gif  " alt="Archive" /></a>
+        <a href="#"><img src="https://tele.assunayuuki.ru/ie.gif  " alt="IE" /></a>
+        <a href="#"><img src="https://tele.assunayuuki.ru/built_with_amiga02.gif  " alt="Amiga" /></a>
+        <a href="#"><img src="https://tele.assunayuuki.ru/c64ik.gif  " alt="C64" /></a>
+        <a href="#"><img src="https://tele.assunayuuki.ru/css3.gif  " alt="сss" /></a>
       </footer>
     </div>
   </div>

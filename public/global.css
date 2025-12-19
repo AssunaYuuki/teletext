@@ -1,15 +1,13 @@
-/* global.css */
-
 :root {
-    --bg: #12161a;
-    --fg: #e0f0e0;
-    --accent: #00ff99;
-    --card-bg: #0e1410;
+    --bg: #12161a; /* светлее */
+    --fg: #e0f0e0; /* светлее */
+    --accent: #00ff99; /* ярче */
+    --card-bg: #0e1410; /* чуть темнее для контраста */
     --hover-bg: #141e16;
     --border: 1px solid #006644;
     --font-mono: 'Courier New', monospace;
-    --shadow: rgba(0, 255, 153, 0.1);
-    --glow: 0 0 10px rgba(0, 255, 153, 0.4);
+    --shadow: rgba(0, 255, 153, 0.1); /* светлее */
+    --glow: 0 0 10px rgba(0, 255, 153, 0.4); /* ярче */
 }
 
 * {
@@ -44,12 +42,10 @@ h1, h2 {
     margin: 10px 0;
     color: var(--accent);
     text-shadow: 0 0 8px rgba(0, 255, 153, 0.6);
-    word-wrap: break-word; /* Позволяет разбивать длинные слова/заголовки */
 }
 .subtitle {
     opacity: 0.7;
     font-size: 0.9rem;
-    word-wrap: break-word; /* Позволяет разбивать длинные слова */
 }
 .breadcrumb {
     display: flex;
@@ -59,7 +55,6 @@ h1, h2 {
     font-size: 0.9rem;
     opacity: 0.7;
     margin-top: 5px;
-    justify-content: center; /* Центрируем хлебные крошки */
 }
 
 .breadcrumb-item:hover {
@@ -116,7 +111,7 @@ h1, h2 {
 /* Сетка — с мягким градиентом */
 .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); /* Адаптивная ширина карточек */
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
     gap: 12px;
     padding: 10px;
     background: rgba(0, 30, 15, 0.2);
@@ -127,7 +122,7 @@ h1, h2 {
 /* 🖼Карточки — с лёгкой тенью и свечением */
 .card, .page {
     display: block;
-    background: #0e1410;
+    background: #0e1410; /* тёмная карточка */
     border: 1px solid var(--accent);
     border-radius: 6px;
     padding: 10px;
@@ -177,7 +172,7 @@ h1, h2 {
     max-width: 100%;
     object-fit: contain;
     vertical-align: middle;
-    filter: brightness(1.1);
+    filter: brightness(1.1); /* чуть ярче */
     transition: all 0.3s ease;
 }
 
@@ -215,11 +210,8 @@ h1, h2 {
     flex-wrap: wrap;
     gap: 10px;
     padding: 10px 0;
-    flex-direction: column; /* Сначала ставим в колонку для мобилок */
-    align-items: stretch; /* Растягиваем элементы на ширину */
-    text-align: center; /* Центрируем текст внутри h2 */
 }
-.nav-bar button, .nav-bar .btn-list, .nav-bar a {
+.nav-bar button, .nav-bar .btn-list {
     padding: 6px 12px;
     background: var(--card-bg);
     color: var(--fg);
@@ -229,12 +221,8 @@ h1, h2 {
     transition: all 0.2s ease;
     font-family: var(--font-mono);
     border-radius: 4px;
-    text-align: center; /* Центрируем текст кнопок */
-    margin: 0 auto; /* Центрируем кнопки */
-    max-width: 100%; /* Ограничиваем ширину */
-    box-sizing: border-box;
 }
-.nav-bar button:hover, .nav-bar .btn-list:hover, .nav-bar a:hover {
+.nav-bar button:hover, .nav-bar .btn-list:hover {
     background: var(--accent);
     color: var(--bg);
     box-shadow: var(--glow);
@@ -252,8 +240,6 @@ h1, h2 {
     text-align: center;
     font-family: var(--font-mono);
     border-radius: 4px;
-    margin: 0 auto; /* Центрируем инпут */
-    display: block; /* Делаем блочным для центрирования */
 }
 
 /* 🖼️ Сетка превью страниц */
@@ -272,12 +258,11 @@ h1, h2 {
     align-items: center;
     gap: 8px;
     text-shadow: 0 0 5px rgba(0, 255, 153, 0.4);
-    justify-content: center; /* Центрируем заголовок */
 }
 
 .thumbs-grid .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); /* Уменьшаем минимальную ширину для мобилок */
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 8px;
 }
 
@@ -288,7 +273,7 @@ h1, h2 {
     overflow: hidden;
     transition: all 0.2s ease;
     background: var(--hover-bg);
-    height: 120px; /* Уменьшаем высоту */
+    height: 140px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -302,7 +287,7 @@ h1, h2 {
 
 .thumbs-grid .thumb-item img {
     width: 100%;
-    height: 80px; /* Уменьшаем высоту изображения */
+    height: 100px;
     object-fit: cover;
     display: block;
 }
@@ -311,7 +296,7 @@ h1, h2 {
     display: block;
     text-align: center;
     color: var(--accent);
-    font-size: 0.8rem; /* Уменьшаем размер шрифта */
+    font-size: 0.9rem;
     padding: 4px;
     background: var(--card-bg);
     font-weight: bold;
@@ -359,500 +344,15 @@ footer {
     font-weight: bold;
     transition: all 0.2s ease;
     font-family: var(--font-mono);
-    text-align: center; /* Центрируем текст кнопки */
-    max-width: 100%; /* Ограничиваем ширину */
-    box-sizing: border-box;
 }
 .btn:hover {
     background: var(--accent);
     color: var(--bg);
     box-shadow: var(--glow);
 }
-
-/* --- АДАПТИВНЫЕ СТИЛИ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ --- */
-@media (max-width: 768px) {
-    body {
-        padding: 8px; /* Уменьшаем основной отступ */
-        font-size: 0.85rem; /* Уменьшаем общий размер шрифта */
-    }
-    .nav-bar {
-        gap: 8px;
-        padding: 8px 0; /* Уменьшаем отступы навбара */
-    }
-    .nav-bar button, .nav-bar .btn-list, .nav-bar a {
-        padding: 8px 16px; /* Увеличиваем отступы для удобства касания */
-        font-size: 1rem; /* Увеличиваем размер шрифта */
-        max-width: 90%; /* Ограничиваем ширину кнопок */
-        margin: 2px auto; /* Увеличиваем отступ между кнопками */
-    }
-    .nav-bar input {
-        width: 80px; /* Увеличиваем ширину инпута */
-        padding: 8px;
-        font-size: 1rem;
-    }
-    h1, h2 {
-        font-size: 1.5rem; /* Уменьшаем заголовки */
-    }
-    .subtitle {
-        font-size: 0.85rem;
-    }
-    .grid {
-        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); /* Уменьшаем ширину карточек */
-        gap: 10px;
-        padding: 8px; /* Уменьшаем отступы сетки */
-    }
-    .card, .page {
-        max-width: 120px; /* Уменьшаем максимальную ширину карточки */
-        padding: 8px; /* Уменьшаем отступы */
-        min-height: 120px; /* Устанавливаем минимальную высоту */
-    }
-    .card img {
-        height: 28px; /* Уменьшаем логотип */
-    }
-    .card span {
-        font-size: 0.8rem; /* Уменьшаем шрифт названия */
-    }
-    .footer {
-        flex-direction: column;
-        gap: 10px;
-        font-size: 0.8rem; /* Уменьшаем шрифт футера */
-    }
-    .btn {
-        padding: 10px 18px; /* Уменьшаем отступы кнопки */
-        font-size: 0.95rem; /* Уменьшаем шрифт кнопки */
-        max-width: 95%; /* Почти вся ширина */
-    }
-    .breadcrumb {
-        font-size: 0.8rem; /* Уменьшаем шрифт хлебных крошек */
-        flex-wrap: wrap; /* Разрешаем перенос строки */
-    }
-    .breadcrumb a {
-        padding: 1px 3px; /* Уменьшаем отступы в хлебных крошках */
-    }
-    .teletext-frame {
-        min-width: 300px; /* Уменьшаем минимальную ширину фрейма */
-        padding: 8px; /* Уменьшаем внутренние отступы */
-        font-size: 0.8rem; /* Уменьшаем размер шрифта в фрейме */
-    }
-    .thumbs-grid {
-        padding: 10px; /* Уменьшаем отступы */
-    }
-    .thumbs-grid h3 {
-        font-size: 1.1rem; /* Уменьшаем шрифт заголовка */
-        margin-bottom: 8px;
-    }
-    .thumbs-grid .grid {
-        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); /* Уменьшаем ширину превьюшек */
-        gap: 6px; /* Уменьшаем зазор */
-    }
-    .thumbs-grid .thumb-item {
-        height: 100px; /* Уменьшаем высоту превьюшки */
-    }
-    .thumbs-grid .thumb-item img {
-        height: 60px; /* Уменьшаем изображение превьюшки */
-    }
-    .thumbs-grid .thumb-item span {
-        font-size: 0.7rem; /* Уменьшаем шрифт номера */
-    }
-    /* Стили для мобильной версии index.ejs */
-    .country-bar {
-        flex-wrap: wrap; /* Разрешаем перенос строк */
-        gap: 10px; /* Уменьшаем зазор между кнопками */
-        padding: 10px 0; /* Уменьшаем отступы */
-    }
-    .country-btn {
-        min-width: 120px; /* Уменьшаем минимальную ширину кнопки */
-        padding: 10px 14px;
-        font-size: 0.9rem;
-        margin: 2px; /* Уменьшаем отступ между кнопками */
-    }
-    .country-btn svg {
-        width: 18px;
-        height: 12.6px; /* Сохраняем пропорции */
-    }
-    /* Стили для мобильной версии folder.ejs */
-    .folder-container {
-        padding: 10px 0; /* Уменьшаем отступ */
-    }
-    .content-wrapper {
-        padding: 0 8px; /* Уменьшаем отступы */
-    }
-    .header h1 {
-        font-size: 1.6rem; /* Уменьшаем заголовок */
-    }
-    /* Стили для мобильной версии edit-card.ejs */
-    .edit-container {
-        padding: 15px; /* Уменьшаем отступы */
-        margin: 10px auto; /* Уменьшаем отступы */
-    }
-    h1 {
-        font-size: 1.6rem; /* Уменьшаем заголовок */
-    }
-    .form-group input[type="text"],
-    .form-group textarea,
-    .form-group input[type="file"] {
-        padding: 8px; /* Уменьшаем отступы инпутов */
-        font-size: 0.9rem; /* Уменьшаем шрифт */
-    }
-    .btn {
-        padding: 8px 16px; /* Уменьшаем отступы кнопки */
-        font-size: 0.9rem; /* Уменьшаем шрифт */
-    }
-    .card-preview {
-        max-width: 280px; /* Уменьшаем ширину превью карточки */
-        padding: 12px; /* Уменьшаем отступы */
-        font-size: 0.85rem; /* Уменьшаем шрифт */
-    }
-    .card-preview .card-title {
-        font-size: 1rem; /* Уменьшаем шрифт названия в превью */
-    }
-    /* Стили для мобильной версии manager.ejs */
-    .manager-container {
-        padding: 10px; /* Уменьшаем отступ */
-    }
-    .controls {
-        flex-direction: column; /* Ставим элементы управления в колонку */
-        align-items: stretch; /* Растягиваем */
-        gap: 8px; /* Уменьшаем зазор */
-    }
-    .controls input, .controls button {
-        width: 100%; /* Растягиваем на ширину */
-        padding: 8px 12px; /* Увеличиваем отступы */
-        font-size: 0.9rem; /* Уменьшаем шрифт */
-        margin-bottom: 4px; /* Отступ снизу */
-    }
-    #drop-zone div {
-        flex-direction: column; /* Ставим иконку и текст вертикально */
-        gap: 4px;
-        padding: 8px; /* Уменьшаем отступы */
-    }
-    #drop-zone span {
-        font-size: 1rem; /* Уменьшаем шрифт */
-    }
-    .items-grid {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* Уменьшаем ширину карточек */
-        gap: 8px; /* Уменьшаем зазор */
-    }
-    .item-card {
-        padding: 8px; /* Уменьшаем отступы */
-        min-height: 120px; /* Устанавливаем минимальную высоту */
-    }
-    .item-preview img {
-        width: 36px; /* Уменьшаем превью изображения */
-        height: 36px;
-    }
-    .item-name {
-        font-size: 0.8rem; /* Уменьшаем шрифт имени */
-    }
-    .item-size {
-        font-size: 0.7rem; /* Уменьшаем шрифт размера */
-    }
-    .item-actions button {
-        width: 18px; /* Уменьшаем размер кнопки действия */
-        height: 18px;
-        font-size: 0.7rem;
-    }
-    /* Стили для мобильной версии page.ejs */
-    .page-container {
-        padding: 10px 0; /* Уменьшаем отступ */
-    }
-    .content-wrapper {
-        padding: 0 8px; /* Уменьшаем отступы */
-    }
-    /* Стили для мобильной версии about.ejs */
-    .about-container {
-        padding: 15px; /* Уменьшаем отступ */
-    }
-    .about-container h2 {
-        font-size: 1.4rem; /* Уменьшаем заголовок */
-    }
-    .features-grid {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); /* Уменьшаем ширину карточек */
-        gap: 10px; /* Уменьшаем зазор */
-    }
-    .feature-card {
-        padding: 10px; /* Уменьшаем отступы */
-        font-size: 0.85rem; /* Уменьшаем шрифт */
-    }
-    .feature-card span {
-        font-size: 1.1rem; /* Уменьшаем иконку */
-    }
-    .author-info {
-        flex-direction: column; /* Ставим аватар и текст вертикально */
-        align-items: center;
-        gap: 10px; /* Уменьшаем зазор */
-    }
-    .discord-avatar {
-        width: 40px; /* Уменьшаем аватар */
-        height: 40px;
-    }
-    .copyright {
-        font-size: 0.8rem; /* Уменьшаем шрифт копирайта */
-    }
+@media (max-width: 600px) {
+    .grid { grid-template-columns: repeat(3, 1fr); }
+    .nav-bar { flex-direction: column; }
+    footer { flex-direction: column; }
 }
 
-@media (max-width: 480px) {
-    body {
-        padding: 6px; /* Дополнительно уменьшаем основной отступ */
-        font-size: 0.8rem; /* Дополнительно уменьшаем общий размер шрифта */
-    }
-    .nav-bar {
-        gap: 6px;
-        padding: 6px 0; /* Дополнительно уменьшаем отступы навбара */
-    }
-    .nav-bar button, .nav-bar .btn-list, .nav-bar a {
-        padding: 10px 12px; /* Увеличиваем отступы */
-        font-size: 1.1rem; /* Увеличиваем размер шрифта */
-        max-width: 95%; /* Почти вся ширина */
-    }
-    .nav-bar input {
-        width: 70px; /* Уменьшаем ширину инпута */
-        padding: 6px;
-        font-size: 0.95rem;
-    }
-    h1, h2 {
-        font-size: 1.3rem; /* Дополнительно уменьшаем заголовки */
-    }
-    .subtitle {
-        font-size: 0.8rem;
-    }
-    .grid {
-        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); /* Ещё уменьшаем ширину карточек */
-        gap: 8px;
-        padding: 6px;
-    }
-    .card, .page {
-        max-width: 100px; /* Дополнительно уменьшаем максимальную ширину карточки */
-        padding: 6px; /* Дополнительно уменьшаем отступы */
-        min-height: 100px; /* Уменьшаем минимальную высоту */
-    }
-    .card img {
-        height: 24px; /* Дополнительно уменьшаем логотип */
-    }
-    .card span {
-        font-size: 0.75rem; /* Дополнительно уменьшаем шрифт названия */
-        line-height: 1.1; /* Уменьшаем межстрочный интервал */
-    }
-    .thumbs-grid .grid {
-        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); /* Уменьшаем ширину превьюшек */
-    }
-    .thumbs-grid .thumb-item {
-        height: 90px; /* Уменьшаем высоту превьюшки */
-    }
-    .thumbs-grid .thumb-item img {
-        height: 50px; /* Уменьшаем изображение превьюшки */
-    }
-    .thumbs-grid .thumb-item span {
-        font-size: 0.65rem; /* Уменьшаем шрифт номера */
-    }
-    .btn {
-        padding: 8px 14px; /* Уменьшаем отступы кнопки */
-        font-size: 0.9rem; /* Уменьшаем шрифт кнопки */
-    }
-    .breadcrumb {
-        font-size: 0.75rem; /* Дополнительно уменьшаем шрифт хлебных крошек */
-    }
-    .breadcrumb a {
-        font-size: 0.75rem; /* Уменьшаем шрифт ссылки */
-    }
-    .teletext-frame {
-        min-width: 280px; /* Уменьшаем минимальную ширину фрейма */
-        padding: 6px; /* Уменьшаем внутренние отступы */
-        font-size: 0.75rem; /* Уменьшаем размер шрифта в фрейме */
-    }
-    .country-btn {
-        min-width: 100px; /* Уменьшаем минимальную ширину кнопки */
-        padding: 8px 10px;
-        font-size: 0.85rem;
-        margin: 1px; /* Уменьшаем отступ между кнопками */
-    }
-    .country-btn svg {
-        width: 16px;
-        height: 11px;
-    }
-    .header h1 {
-        font-size: 1.4rem; /* Уменьшаем заголовок */
-    }
-    .edit-container {
-        padding: 12px; /* Уменьшаем отступы */
-    }
-    h1 {
-        font-size: 1.4rem; /* Уменьшаем заголовок */
-    }
-    .form-group input[type="text"],
-    .form-group textarea,
-    .form-group input[type="file"] {
-        padding: 6px; /* Уменьшаем отступы инпутов */
-        font-size: 0.85rem; /* Уменьшаем шрифт */
-    }
-    .btn {
-        padding: 6px 12px; /* Уменьшаем отступы кнопки */
-        font-size: 0.85rem; /* Уменьшаем шрифт */
-    }
-    .card-preview {
-        max-width: 240px; /* Уменьшаем ширину превью карточки */
-        padding: 10px; /* Уменьшаем отступы */
-        font-size: 0.8rem; /* Уменьшаем шрифт */
-    }
-    .card-preview .card-title {
-        font-size: 0.9rem; /* Уменьшаем шрифт названия в превью */
-    }
-    .items-grid {
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); /* Уменьшаем ширину карточек */
-        gap: 6px; /* Уменьшаем зазор */
-    }
-    .item-card {
-        padding: 6px; /* Уменьшаем отступы */
-        min-height: 100px; /* Уменьшаем минимальную высоту */
-    }
-    .item-preview img {
-        width: 32px; /* Уменьшаем превью изображения */
-        height: 32px;
-    }
-    .item-name {
-        font-size: 0.75rem; /* Уменьшаем шрифт имени */
-    }
-    .item-size {
-        font-size: 0.65rem; /* Уменьшаем шрифт размера */
-    }
-    .about-container {
-        padding: 12px; /* Уменьшаем отступ */
-    }
-    .about-container h2 {
-        font-size: 1.3rem; /* Уменьшаем заголовок */
-    }
-    .features-grid {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* Уменьшаем ширину карточек */
-        gap: 8px; /* Уменьшаем зазор */
-    }
-    .feature-card {
-        padding: 8px; /* Уменьшаем отступы */
-        font-size: 0.8rem; /* Уменьшаем шрифт */
-    }
-    .feature-card span {
-        font-size: 1rem; /* Уменьшаем иконку */
-    }
-    .copyright {
-        font-size: 0.75rem; /* Уменьшаем шрифт копирайта */
-    }
-}
-
-/* Для очень узких экранов */
-@media (max-width: 360px) {
-    body {
-        padding: 4px; /* Минимальный отступ */
-        font-size: 0.75rem; /* Минимальный размер шрифта */
-    }
-    .nav-bar button, .nav-bar .btn-list, .nav-bar a {
-        font-size: 0.9rem; /* Уменьшаем шрифт кнопок */
-        padding: 8px 10px; /* Уменьшаем отступы кнопок */
-    }
-    h1, h2 {
-        font-size: 1.2rem; /* Дополнительно уменьшаем заголовки */
-    }
-    .grid {
-        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); /* Минимальная ширина */
-    }
-    .card, .page {
-        max-width: 80px; /* Минимальная ширина карточки */
-        padding: 4px; /* Минимальные отступы */
-        min-height: 80px; /* Минимальная высота */
-    }
-    .card img {
-        height: 20px; /* Минимальный логотип */
-    }
-    .card span {
-        font-size: 0.7rem; /* Минимальный шрифт названия */
-        line-height: 1.05;
-    }
-    .thumbs-grid .grid {
-        grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); /* Минимальная ширина превью */
-    }
-    .thumbs-grid .thumb-item {
-        height: 80px; /* Минимальная высота превьюшки */
-    }
-    .thumbs-grid .thumb-item img {
-        height: 45px; /* Минимальное изображение превьюшки */
-    }
-    .thumbs-grid .thumb-item span {
-        font-size: 0.6rem; /* Минимальный шрифт номера */
-    }
-    .btn {
-        padding: 6px 10px; /* Уменьшаем отступы кнопки */
-        font-size: 0.8rem; /* Уменьшаем шрифт кнопки */
-    }
-    .country-btn {
-        min-width: 80px; /* Уменьшаем минимальную ширину кнопки */
-        padding: 6px 8px;
-        font-size: 0.8rem;
-    }
-    .country-btn svg {
-        width: 14px;
-        height: 9.8px;
-    }
-    .header h1 {
-        font-size: 1.2rem; /* Уменьшаем заголовок */
-    }
-    .edit-container {
-        padding: 10px; /* Уменьшаем отступы */
-    }
-    h1 {
-        font-size: 1.2rem; /* Уменьшаем заголовок */
-    }
-    .form-group input[type="text"],
-    .form-group textarea,
-    .form-group input[type="file"] {
-        padding: 5px; /* Уменьшаем отступы инпутов */
-        font-size: 0.8rem; /* Уменьшаем шрифт */
-    }
-    .btn {
-        padding: 5px 10px; /* Уменьшаем отступы кнопки */
-        font-size: 0.8rem; /* Уменьшаем шрифт */
-    }
-    .card-preview {
-        max-width: 200px; /* Уменьшаем ширину превью карточки */
-        padding: 8px; /* Уменьшаем отступы */
-        font-size: 0.75rem; /* Уменьшаем шрифт */
-    }
-    .card-preview .card-title {
-        font-size: 0.85rem; /* Уменьшаем шрифт названия в превью */
-    }
-    .items-grid {
-        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); /* Минимальная ширина карточек */
-        gap: 5px; /* Минимальный зазор */
-    }
-    .item-card {
-        padding: 5px; /* Уменьшаем отступы */
-        min-height: 80px; /* Уменьшаем минимальную высоту */
-    }
-    .item-preview img {
-        width: 28px; /* Уменьшаем превью изображения */
-        height: 28px;
-    }
-    .item-name {
-        font-size: 0.7rem; /* Уменьшаем шрифт имени */
-    }
-    .item-size {
-        font-size: 0.6rem; /* Уменьшаем шрифт размера */
-    }
-    .about-container {
-        padding: 10px; /* Уменьшаем отступ */
-    }
-    .about-container h2 {
-        font-size: 1.2rem; /* Уменьшаем заголовок */
-    }
-    .features-grid {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* Минимальная ширина карточек */
-        gap: 6px; /* Уменьшаем зазор */
-    }
-    .feature-card {
-        padding: 6px; /* Уменьшаем отступы */
-        font-size: 0.75rem; /* Уменьшаем шрифт */
-    }
-    .feature-card span {
-        font-size: 0.9rem; /* Уменьшаем иконку */
-    }
-    .copyright {
-        font-size: 0.7rem; /* Уменьшаем шрифт копирайта */
-    }
-}
