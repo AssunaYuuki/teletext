@@ -1052,7 +1052,6 @@ app.use((req, res) => {
     res.status(404).render('error', { message: 'Страница не найдена' });
 });
 
-
 app.listen(port, () => {
     logAction('SERVER_START', `http://localhost:${port}`);
     console.log(`✅ Телетекст-плеер запущен: http://localhost:${port}`);
