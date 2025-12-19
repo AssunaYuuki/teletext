@@ -307,10 +307,10 @@
       <input type="file" id="file-input" multiple directory webkitdirectory accept=".html,.png,.svg,.txt,.css,.js,.json,.jpg,.jpeg,.gif,.webp" />
       <button onclick="document.getElementById('file-input').click()">⬆️ Загрузить файлы/папки</button>
       <button onclick="pasteItem()" id="paste-btn" style="display:none;">📋 Вставить</button>
-      <button onclick="regenerateThumbnails('<%= currentPath %>')">🔄 Обновить превьюшки (250x250)</button>
-      <div id="progress-container">
-        <div id="progress-bar"></div>
-        <div id="progress-text">Загрузка...</div>
+      <button onclick="regenerateThumbnailsFast('<%= currentPath %>')">🔄 Обновить превьюшки (быстро)</button>
+      <div id="regenerate-progress-container" style="display:none; margin-top:10px;">
+          <div id="regenerate-progress-bar" style="height:10px; background:var(--accent); width:0%; border-radius:5px; transition:width 0.3s;"></div>
+          <div id="regenerate-progress-text" style="font-size:0.8rem; color:var(--accent); margin-top:5px;">Загрузка...</div>
       </div>
     </div>
 
@@ -739,6 +739,81 @@
         progressText.textContent = '❌ Ошибка сети';
         setTimeout(() => {
           alert('Ошибка сети');
+          progressContainer.style.display = 'none';
+        }, 1000);
+      }
+    }
+
+    // ✅ Перегенерация превьюшек (быстро) через SSE
+    async function regenerateThumbnailsFast(path) {
+      if (!confirm('Вы уверены, что хотите быстро перегенерировать все превьюшки в этой папке? Это может занять время.')) return;
+
+      const progressContainer = document.getElementById('regenerate-progress-container');
+      const progressBar = document.getElementById('regenerate-progress-bar');
+      const progressText = document.getElementById('regenerate-progress-text');
+
+      progressContainer.style.display = 'block';
+
+      try {
+        const response = await fetch(`/manager/regenerate-thumbnails-fast/${encodeURIComponent(path)}`, {
+          method: 'POST'
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // Последняя строка может быть неполной
+
+          for (const line of lines) {
+            if (line.trim() === '') continue;
+            try {
+              const data = JSON.parse(line.trim());
+              console.log('Progress:', data); // Показываем в консоли
+
+              if (data.progress !== undefined) {
+                progressBar.style.width = data.progress + '%';
+                progressText.textContent = `Перегенерация... ${data.progress}% (${data.current}/${data.total})`;
+              }
+
+              if (data.success === false) {
+                alert('❌ Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                progressText.textContent = '❌ Ошибка';
+                setTimeout(() => {
+                  progressContainer.style.display = 'none';
+                }, 1000);
+                return;
+              }
+
+              if (data.success === true) {
+                progressBar.style.width = '100%';
+                progressText.textContent = '✅ Превьюшки обновлены!';
+                setTimeout(() => {
+                  location.reload();
+                }, 500);
+                return;
+              }
+            } catch (e) {
+              console.error('Ошибка парсинга строки:', line, e);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Ошибка быстрой перегенерации:', err);
+        alert('Ошибка сети');
+        progressText.textContent = '❌ Ошибка сети';
+        setTimeout(() => {
           progressContainer.style.display = 'none';
         }, 1000);
       }

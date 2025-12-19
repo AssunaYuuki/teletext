@@ -928,6 +928,123 @@ app.get('/regenerate-thumbnails-stream/*', async (req, res) => {
     res.end();
 });
 
+// ✅ Оптимизированная перегенерация всех превьюшек в папке (250x250) через workers (маршрут для manager.ejs)
+app.post('/manager/regenerate-thumbnails-fast/*', async (req, res) => {
+    const requestedPath = req.params[0] || '';
+    let decodedPath = requestedPath;
+
+    if (!isValidPath(decodedPath)) {
+        return res.status(400).json({ error: 'Недопустимый путь' });
+    }
+
+    const fullPath = path.join(__dirname, 'teletext', decodedPath);
+    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+        return res.status(404).json({ error: 'Папка не найдена' });
+    }
+
+    const htmlFiles = fs.readdirSync(fullPath).filter(f => f.endsWith('.html'));
+    const totalFiles = htmlFiles.length;
+
+    if (totalFiles === 0) {
+        return res.json({ success: true, message: 'Нет HTML-файлов для генерации превьюшек' });
+    }
+
+    // Устанавливаем SSE-заголовки
+    res.writeHead(200, {
+        'Content-Type': 'text/plain',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache'
+    });
+
+    const errors = [];
+    const generated = [];
+
+    // --- Твой код с workers ---
+    const MAX_CONCURRENT_PAGES = 5;
+    let browser;
+
+    try {
+        browser = await puppeteer.launch({
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-web-security'
+            ],
+            defaultViewport: { width: 800, height: 600 }
+        });
+
+        let currentIndex = 0;
+        let completed = 0;
+
+        const workers = new Array(MAX_CONCURRENT_PAGES).fill(null).map(async () => {
+            const page = await browser.newPage();
+            while (currentIndex < totalFiles) {
+                let index;
+                if (currentIndex < totalFiles) {
+                    index = currentIndex++;
+                } else {
+                    break;
+                }
+                const file = htmlFiles[index];
+                const pageStr = file.replace('.html', '');
+                const pageNum = parseInt(pageStr, 10);
+                if (isNaN(pageNum) || pageNum < 100 || pageNum > 999) {
+                    completed++;
+                    if (completed % 5 === 0 || completed === totalFiles) { // Отправляем прогресс каждые 5 файлов или в конце
+                        const progress = Math.round((completed / totalFiles) * 100);
+                        res.write(` ${JSON.stringify({ progress, current: completed, total: totalFiles, generated: [] })}\n\n`);
+                    }
+                    continue;
+                }
+
+                const htmlPath = path.join(fullPath, file);
+                const pngPath = path.join(fullPath, `${pageNum}.png`);
+
+                try {
+                    await page.goto(`file://${htmlPath}`, { waitUntil: 'networkidle2', timeout: 15000 });
+                    await page.screenshot({ path: pngPath, type: 'png', fullPage: true });
+
+                    const buffer = fs.readFileSync(pngPath);
+                    const resizedBuffer = await sharp(buffer)
+                        .resize(250, 250, { fit: 'cover', position: 'center' })
+                        .toBuffer();
+                    fs.writeFileSync(pngPath, resizedBuffer);
+                    generated.push(`${pageNum}.png`);
+                    logAction('THUMBNAIL_GENERATED_250x250', pngPath);
+                } catch (err) {
+                    errors.push(`${file}: ${err.message}`);
+                    logAction('THUMBNAIL_REGEN_ERROR', `${pngPath}: ${err.message}`);
+                }
+
+                completed++;
+                if (completed % 5 === 0 || completed === totalFiles) { // Отправляем прогресс каждые 5 файлов или в конце
+                    const progress = Math.round((completed / totalFiles) * 100);
+                    res.write(` ${JSON.stringify({ progress, current: completed, total: totalFiles, generated: [`${pageNum}.png`] })}\n\n`);
+                    res.flushHeaders(); // Отправляем заголовки (если поддерживается)
+                }
+            }
+            await page.close();
+        });
+
+        await Promise.all(workers);
+    } finally {
+        if (browser) await browser.close();
+    }
+
+    const finalData = {
+        success: true,
+        errors: errors.length > 0 ? errors : undefined,
+        generated,
+        message: 'Все превьюшки обновлены!'
+    };
+
+    res.write(` ${JSON.stringify(finalData)}\n\n`);
+    res.end();
+});
+
 // 404
 app.use((req, res) => {
     res.status(404).render('error', { message: 'Страница не найдена' });
