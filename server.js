@@ -177,6 +177,9 @@ app.get('/folder/*', async (req, res) => {
     const folders = items.filter(item => fs.statSync(path.join(fullPath, item)).isDirectory());
     const htmlFiles = items.filter(item => item.endsWith('.html'));
 
+    // ✅ Объявляем pages до условий
+    let pages = [];
+
     // ✅ Группировка страниц по годам (извлекаем из имени файла)
     const pagesByYear = {};
     htmlFiles.forEach(file => {
@@ -215,6 +218,14 @@ app.get('/folder/*', async (req, res) => {
     sortedYears.forEach(year => {
         groupedPages[year] = pagesByYear[year].sort((a, b) => a.page - b.page); // По возрастанию номера страницы
     });
+
+    // ✅ Инициализируем обычный список страниц
+    pages = htmlFiles.map(file => {
+        const pageStr = file.replace('.html', '');
+        const page = parseInt(pageStr, 10);
+        const hasThumb = fs.existsSync(path.join(fullPath, `${pageStr}.png`));
+        return { page, hasThumb };
+    }).filter(p => !isNaN(p.page) && p.page >= 100 && p.page <= 999);
 
     const pathParts = decodedPath.split('/').filter(Boolean);
     const breadcrumb = pathParts.map((part, i) => ({ name: part, path: pathParts.slice(0, i + 1).join('/') }));
@@ -266,6 +277,7 @@ app.get('/folder/*', async (req, res) => {
         currentPath: decodedPath,
         folders,
         groupedPages,
+        pages,        // ✅ Теперь переменная определена
         breadcrumb,
         hasLogo: logoExists || logoExistsPng,
         logoUrl,
