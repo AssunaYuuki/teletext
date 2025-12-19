@@ -4,7 +4,7 @@ const fs = require('fs');
 const multer = require('multer');
 const os = require('os');
 const puppeteer = require('puppeteer');
-const sharp = require("sharp");
+const sharp = require('sharp'); // ✅ Для оптимизации PNG
 
 require('dotenv').config({ quiet: true });
 
@@ -227,6 +227,40 @@ app.get('/folder/*', async (req, res) => {
         return { page, hasThumb };
     }).filter(p => !isNaN(p.page) && p.page >= 100 && p.page <= 999);
 
+    // ✅ Группировка подпапок по годам (для отображения в folder.ejs)
+    const foldersByYear = {};
+    folders.forEach(folder => {
+        let year = 0; // Если год не найден — будет 0
+
+        // Ищем год в имени папки (например, "1KANAL 01.12.2006" -> 2006, "Channel 95" -> 1995)
+        const dateMatch = folder.match(/(\d{2}|\d{4})$/);
+        if (dateMatch) {
+            const yearPart = dateMatch[1];
+            if (yearPart.length === 4) {
+                year = parseInt(yearPart, 10); // 1995, 2003...
+            } else if (yearPart.length === 2) {
+                const num = parseInt(yearPart, 10);
+                // Превращаем 95 в 1995, 03 в 2003
+                year = num > 25 ? 1900 + num : 2000 + num; // Условно: 26-99 -> 19xx, 00-25 -> 20xx
+            }
+        }
+
+        if (!foldersByYear[year]) {
+            foldersByYear[year] = [];
+        }
+        foldersByYear[year].push(folder);
+    });
+
+    // Сортируем годы (новые — вверху) и папки внутри года
+    const sortedFolderYears = Object.keys(foldersByYear)
+        .map(y => parseInt(y, 10))
+        .sort((a, b) => b - a); // От новых к старым
+
+    const groupedFolders = {};
+    sortedFolderYears.forEach(year => {
+        groupedFolders[year] = foldersByYear[year].sort(); // По алфавиту
+    });
+
     const pathParts = decodedPath.split('/').filter(Boolean);
     const breadcrumb = pathParts.map((part, i) => ({ name: part, path: pathParts.slice(0, i + 1).join('/') }));
 
@@ -277,7 +311,8 @@ app.get('/folder/*', async (req, res) => {
         currentPath: decodedPath,
         folders,
         groupedPages,
-        pages,        // ✅ Теперь переменная определена
+        groupedFolders,
+        pages,
         breadcrumb,
         hasLogo: logoExists || logoExistsPng,
         logoUrl,
@@ -702,10 +737,11 @@ app.post('/rename-item/*', (req, res) => {
             } catch (renameErr) {
                 if (renameErr.code === 'EPERM' && i < maxRetries - 1) {
                     logAction('ITEM_RENAME_RETRY', `${requestedPath}/${cleanOldName}: попытка ${i + 1} из ${maxRetries} (EPERM)`);
+                    // Задержка перед повторной попыткой
                     const start = Date.now();
                     while (Date.now() - start < 1000);
                 } else {
-                    throw renameErr;
+                    throw renameErr; // Прерываем цикл, если не EPERM или последняя попытка
                 }
             }
         }
@@ -895,6 +931,7 @@ app.get('/regenerate-thumbnails-stream/*', async (req, res) => {
 app.use((req, res) => {
     res.status(404).render('error', { message: 'Страница не найдена' });
 });
+
 
 app.listen(port, () => {
     logAction('SERVER_START', `http://localhost:${port}`);
