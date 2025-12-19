@@ -942,6 +942,8 @@ app.post('/manager/regenerate-thumbnails-fast/*', async (req, res) => {
         return res.status(404).json({ error: 'Папка не найдена' });
     }
 
+
+
     const htmlFiles = fs.readdirSync(fullPath).filter(f => f.endsWith('.html'));
     const totalFiles = htmlFiles.length;
 
