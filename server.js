@@ -30,16 +30,21 @@ app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader(
-        'Content-Security-Policy',
-        "default-src 'self'; " +
-        "img-src 'self' https://cdn.discordapp.com https://okgamer.ru/uploads/fotos/; " +
-        "style-src 'self' 'unsafe-inline'; " +
-        "script-src 'self' 'unsafe-inline' https://mc.yandex.ru https://yastatic.net; " +
-        "script-src-elem 'self' 'unsafe-inline' https://mc.yandex.ru https://yastatic.net; " +
-        "font-src 'self'; " +
-        "connect-src 'self' https://mc.yandex.ru wss://mc.yandex.ru"
-    );
+
+    const csp = [
+        "default-src 'self'",
+        "img-src 'self' https://cdn.discordapp.com https://okgamer.ru/uploads/fotos/ https://mc.yandex.ru https://yastatic.net data:", // поддержать data-uri
+        "style-src 'self' 'unsafe-inline'", // нужно для встроенных стилей
+        "script-src 'self' 'unsafe-inline' https://mc.yandex.ru https://yastatic.net https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.staticaly.com", // js с известных CDN + Яндекс
+        "script-src-elem 'self' 'unsafe-inline' https://mc.yandex.ru https://yastatic.net https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.staticaly.com", // для тегов <script src=...>
+        "font-src 'self' https://fonts.gstatic.com", // шрифты Google
+        "connect-src 'self' https://mc.yandex.ru wss://mc.yandex.ru https://yastatic.net https://stats.g.doubleclick.net", // соединения для аналитики и метрик
+        "frame-ancestors 'none'", // запрет вставки в iframe
+        "base-uri 'self'", // базовый URI (безопасность)
+        "form-action 'self'" // формы можно отправлять только на этот домен
+    ].join('; ');
+
+    res.setHeader('Content-Security-Policy', csp);
     next();
 });
 
