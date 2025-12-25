@@ -27,10 +27,6 @@ app.use(express.json());
 
 // Security headers
 app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-
     const csp = [
         "default-src 'self'",
         "img-src 'self' https://cdn.discordapp.com https://okgamer.ru/uploads/fotos/ https://mc.yandex.ru https://yastatic.net data:",
@@ -45,6 +41,9 @@ app.use((req, res, next) => {
     ].join('; ');
 
     res.setHeader('Content-Security-Policy', csp);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
     next();
 });
 
