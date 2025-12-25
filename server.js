@@ -36,7 +36,8 @@ app.use((req, res, next) => {
         "img-src 'self' https://cdn.discordapp.com https://okgamer.ru/uploads/fotos/; " +
         "style-src 'self' 'unsafe-inline'; " +
         "script-src 'self' 'unsafe-inline' https://mc.yandex.ru; " +
-        "font-src 'self';"
+        "font-src 'self'; " +
+        "connect-src 'self' https://mc.yandex.ru wss://mc.yandex.ru"
     );
     next();
 });
