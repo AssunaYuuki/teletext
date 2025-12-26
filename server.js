@@ -1,12 +1,154 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
+const fsSync = require('fs');
 const multer = require('multer');
 const os = require('os');
 const puppeteer = require('puppeteer');
-const sharp = require('sharp'); // ✅ Для оптимизации PNG
+const sharp = require('sharp');
 
 require('dotenv').config({ quiet: true });
+
+// ============================================
+// ОБРАБОТКА ОШИБОК
+// ============================================
+
+// Логирование ошибок в файл
+async function logError(error, req) {
+    const timestamp = new Date().toISOString();
+    const logEntry = {
+        timestamp,
+        error: {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        },
+        request: {
+            method: req.method,
+            url: req.url,
+            ip: req.ip || req.connection.remoteAddress,
+            userAgent: req.get('user-agent')
+        }
+    };
+
+    const logDir = path.join(__dirname, 'logs');
+    const logFile = path.join(logDir, `error-${new Date().toISOString().split('T')[0]}.log`);
+
+    try {
+        await fs.mkdir(logDir, { recursive: true });
+        await fs.appendFile(logFile, JSON.stringify(logEntry, null, 2) + '\n');
+    } catch (err) {
+        console.error('Failed to write error log:', err);
+    }
+}
+
+// Wrapper для асинхронных маршрутов
+const asyncHandler = (fn) => (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+// Класс для кастомных ошибок
+class AppError extends Error {
+    constructor(message, statusCode) {
+        super(message);
+        this.statusCode = statusCode;
+        this.isOperational = true;
+        Error.captureStackTrace(this, this.constructor);
+    }
+}
+
+// Глобальный обработчик ошибок
+const errorHandler = async (err, req, res, next) => {
+    // Логируем ошибку
+    await logError(err, req);
+    console.error(`[ERROR] ${err.message}`, err.stack);
+
+    // Определяем статус код
+    let statusCode = err.statusCode || 500;
+    let message = err.message || 'Внутренняя ошибка сервера';
+    let userMessage = message;
+
+    // Обработка специфичных ошибок
+    switch (err.code) {
+        case 'ENOENT':
+            statusCode = 404;
+            userMessage = 'Файл или папка не найдены';
+            break;
+        case 'EPERM':
+        case 'EACCES':
+            statusCode = 403;
+            userMessage = 'Доступ запрещён. Проверьте права доступа к файлам.';
+            break;
+        case 'EEXIST':
+            statusCode = 409;
+            userMessage = 'Файл или папка уже существует';
+            break;
+        case 'ENOTDIR':
+            statusCode = 400;
+            userMessage = 'Указанный путь не является папкой';
+            break;
+        case 'EISDIR':
+            statusCode = 400;
+            userMessage = 'Указанный путь является папкой';
+            break;
+        case 'EMFILE':
+        case 'ENFILE':
+            statusCode = 503;
+            userMessage = 'Слишком много открытых файлов. Попробуйте позже.';
+            break;
+    }
+
+    // Ошибки валидации Multer
+    if (err instanceof Error && err.message.includes('Только SVG/PNG/JPG')) {
+        statusCode = 400;
+        userMessage = err.message;
+    }
+
+    // Ошибки Puppeteer
+    if (err.message && err.message.includes('Navigation timeout')) {
+        statusCode = 504;
+        userMessage = 'Превышено время ожидания загрузки страницы';
+    }
+
+    // Отправляем ответ
+    if (req.accepts('html')) {
+        return res.status(statusCode).render('error', {
+            message: userMessage,
+            status: statusCode,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+            disableCopy: true
+        });
+    } else {
+        return res.status(statusCode).json({
+            error: userMessage,
+            status: statusCode,
+            ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+        });
+    }
+};
+
+// 404 обработчик
+const notFoundHandler = (req, res) => {
+    const statusCode = 404;
+    const message = 'Страница не найдена';
+
+    if (req.accepts('html')) {
+        return res.status(statusCode).render('error', {
+            message,
+            status: statusCode,
+            disableCopy: true
+        });
+    } else {
+        return res.status(statusCode).json({
+            error: message,
+            status: statusCode
+        });
+    }
+};
+
+// ============================================
+// ОСНОВНЫЕ ФУНКЦИИ
+// ============================================
 
 function logAction(action, details = '') {
     const timestamp = new Date().toISOString();
@@ -29,7 +171,7 @@ app.use(express.json());
 app.use((req, res, next) => {
     const csp = [
         "default-src 'self'",
-        "img-src 'self' https://cdn.discordapp.com https://okgamer.ru/uploads/fotos/ https://mc.yandex.ru https://yastatic.net data:",
+        "img-src 'self' https://cdn.discordapp.com https://okgamer.ru/uploads/fotos/ https://mc.yandex.ru https://yastatic.net https://tele.assunayuuki.ru data:",
         "style-src 'self' 'unsafe-inline'",
         "script-src 'self' 'unsafe-inline' https://mc.yandex.ru https://yastatic.net",
         "script-src-elem 'self' 'unsafe-inline' https://mc.yandex.ru https://yastatic.net",
@@ -62,7 +204,7 @@ const upload = multer({
     }
 });
 
-// Multer для файлов — теперь сохраняет структуру папок
+// Multer для файлов
 const uploadFiles = multer({
     storage: multer.diskStorage({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
@@ -88,12 +230,12 @@ const uploadFiles = multer({
 // Валидация путей
 function isValidPath(p) {
     if (!p) return true;
-    const allowedChars = /^[a-zA-Zа-яА-ЯёЁ0-9\s,. -_\/&()'\[\]{}@#~$%^*+=<>:;]+$/u;
+    const allowedChars = /^[a-zA-Zа-яА-ЯёЁ0-9\s,. -_\/&()'$$$${}@#~$%^*+=<>:;]+$/u;
     if (!allowedChars.test(p)) return false;
     return !p.includes('..') && !p.startsWith('/') && !p.includes(':') && !p.includes('\\') && !p.includes('\0');
 }
 
-// ✅ Генерация превью (250x250) с оптимизацией
+// ✅ Генерация превью (асинхронная)
 async function generateThumbnail(htmlPath, pngPath) {
     let browser;
     try {
@@ -110,19 +252,18 @@ async function generateThumbnail(htmlPath, pngPath) {
         });
         const page = await browser.newPage();
         await page.goto(`file://${htmlPath}`, { waitUntil: 'networkidle2', timeout: 15000 });
-        await page.screenshot({ path: pngPath, type: 'png', fullPage: true });
+        const buffer = await page.screenshot({ type: 'png', fullPage: true });
 
-        // ✅ Масштабируем и оптимизируем PNG через sharp
-        const buffer = fs.readFileSync(pngPath);
         const resizedBuffer = await sharp(buffer)
             .resize(250, 250, { fit: 'cover', position: 'center' })
-            .png({ quality: 80, palette: true, dither: 0.5 }) // Уменьшаем вес
+            .png({ quality: 80, palette: true, dither: 0.5 })
             .toBuffer();
-        fs.writeFileSync(pngPath, resizedBuffer);
+
+        await fs.writeFile(pngPath, resizedBuffer);
         logAction('THUMBNAIL_GENERATED_250x250_OPTIMIZED', pngPath);
 
     } catch (err) {
-        throw err;
+        throw new AppError(`Ошибка генерации превью: ${err.message}`, 500);
     } finally {
         if (browser) await browser.close();
     }
@@ -130,125 +271,162 @@ async function generateThumbnail(htmlPath, pngPath) {
 
 const MAX_CONCURRENT = 3;
 async function generateThumbnailsForFolder(fullPath) {
-    const htmlFiles = fs.readdirSync(fullPath).filter(f => f.endsWith('.html'));
-    const tasks = htmlFiles.map(file => async () => {
-        const pageStr = file.replace('.html', '');
-        const page = parseInt(pageStr, 10);
-        if (isNaN(page) || page < 100 || page > 999) return;
-        const htmlPath = path.join(fullPath, file);
-        const pngPath = path.join(fullPath, `${page}.png`);
-        if (!fs.existsSync(pngPath)) {
-            try {
-                await generateThumbnail(htmlPath, pngPath);
-                logAction('THUMBNAIL_GENERATED', `${pngPath}`);
-            } catch (err) {
-                logAction('THUMBNAIL_ERROR', `${pngPath}: ${err.message}`);
+    try {
+        const items = await fs.readdir(fullPath);
+        const htmlFiles = items.filter(f => f.endsWith('.html'));
+
+        const tasks = htmlFiles.map(file => async () => {
+            const pageStr = file.replace('.html', '');
+            const page = parseInt(pageStr, 10);
+            if (isNaN(page) || page < 100 || page > 999) return;
+
+            const htmlPath = path.join(fullPath, file);
+            const pngPath = path.join(fullPath, `${page}.png`);
+
+            const pngExists = await fs.access(pngPath).then(() => true).catch(() => false);
+
+            if (!pngExists) {
+                try {
+                    await generateThumbnail(htmlPath, pngPath);
+                    logAction('THUMBNAIL_GENERATED', `${pngPath}`);
+                } catch (err) {
+                    logAction('THUMBNAIL_ERROR', `${pngPath}: ${err.message}`);
+                }
             }
+        });
+
+        for (let i = 0; i < tasks.length; i += MAX_CONCURRENT) {
+            const chunk = tasks.slice(i, i + MAX_CONCURRENT);
+            await Promise.all(chunk.map(task => task()));
         }
-    });
-    for (let i = 0; i < tasks.length; i += MAX_CONCURRENT) {
-        const chunk = tasks.slice(i, i + MAX_CONCURRENT);
-        await Promise.all(chunk.map(task => task()));
+    } catch (err) {
+        logAction('THUMBNAIL_FOLDER_ERROR', `${fullPath}: ${err.message}`);
     }
 }
 
+// ============================================
+// МАРШРУТЫ
+// ============================================
+
 // 🏠 Главная
-app.get('/', (req, res) => {
+app.get('/', asyncHandler(async (req, res) => {
     const dir = path.join(__dirname, 'teletext');
-    const folders = fs.existsSync(dir)
-        ? fs.readdirSync(dir).filter(f => fs.statSync(path.join(dir, f)).isDirectory())
-        : [];
+
+    let folders = [];
+    const dirExists = await fs.access(dir).then(() => true).catch(() => false);
+
+    if (dirExists) {
+        const items = await fs.readdir(dir);
+        const folderStats = await Promise.all(
+            items.map(async item => {
+                const itemPath = path.join(dir, item);
+                const stats = await fs.stat(itemPath);
+                return { item, isDirectory: stats.isDirectory() };
+            })
+        );
+        folders = folderStats.filter(f => f.isDirectory).map(f => f.item);
+    }
+
     res.render('index', { folders, disableCopy: true });
-});
+}));
 
 // ℹ️ О проекте
 app.get('/about', (req, res) => {
     res.render('about', { disableCopy: true });
 });
 
-// 📁 Папка
-app.get('/folder/*', async (req, res) => {
+// 📁 Папка (асинхронная версия)
+app.get('/folder/*', asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
     let decodedPath = requestedPath;
 
-    if (!isValidPath(decodedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
-
-    const fullPath = path.join(__dirname, 'teletext', decodedPath);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
-        return res.status(404).render('error', { message: 'Папка не найдена' });
+    if (!isValidPath(decodedPath)) {
+        throw new AppError('Недопустимый путь', 400);
     }
 
-    generateThumbnailsForFolder(fullPath).catch(err => console.error('Ошибка генерации:', err));
+    const fullPath = path.join(__dirname, 'teletext', decodedPath);
 
-    const items = fs.readdirSync(fullPath);
-    const folders = items.filter(item => fs.statSync(path.join(fullPath, item)).isDirectory());
-    const htmlFiles = items.filter(item => item.endsWith('.html'));
+    const stats = await fs.stat(fullPath).catch(() => null);
+    if (!stats || !stats.isDirectory()) {
+        throw new AppError('Папка не найдена', 404);
+    }
 
-    // ✅ Объявляем pages до условий
+    generateThumbnailsForFolder(fullPath).catch(err =>
+        logAction('THUMBNAIL_GEN_ERROR', err.message)
+    );
+
+    const items = await fs.readdir(fullPath);
+    const folders = [];
+    const htmlFiles = [];
+
+    await Promise.all(items.map(async item => {
+        const itemPath = path.join(fullPath, item);
+        const itemStats = await fs.stat(itemPath);
+
+        if (itemStats.isDirectory()) {
+            folders.push(item);
+        } else if (item.endsWith('.html')) {
+            htmlFiles.push(item);
+        }
+    }));
+
     let pages = [];
-
-    // ✅ Группировка страниц по годам (извлекаем из имени файла)
     const pagesByYear = {};
-    htmlFiles.forEach(file => {
+
+    for (const file of htmlFiles) {
         const pageStr = file.replace('.html', '');
         const page = parseInt(pageStr, 10);
-        if (isNaN(page) || page < 100 || page > 999) return;
+        if (isNaN(page) || page < 100 || page > 999) continue;
 
-        // Ищем год в имени файла (например, "450_2003.html" -> 2003, "300_95.html" -> 1995)
-        let year = 0; // Если год не найден — будет 0
+        let year = 0;
         const yearMatch = file.match(/_(\d{2}|\d{4})\.html$/);
         if (yearMatch) {
             const yearPart = yearMatch[1];
             if (yearPart.length === 4) {
-                year = parseInt(yearPart, 10); // 1995, 2003...
+                year = parseInt(yearPart, 10);
             } else if (yearPart.length === 2) {
                 const num = parseInt(yearPart, 10);
-                // Превращаем 95 в 1995, 03 в 2003
-                year = num > 25 ? 1900 + num : 2000 + num; // Условно: 26-99 -> 19xx, 00-25 -> 20xx
+                year = num > 25 ? 1900 + num : 2000 + num;
             }
         }
 
-        const hasThumb = fs.existsSync(path.join(fullPath, `${pageStr}.png`));
+        const pngPath = path.join(fullPath, `${pageStr}.png`);
+        const hasThumb = await fs.access(pngPath).then(() => true).catch(() => false);
 
         if (!pagesByYear[year]) {
             pagesByYear[year] = [];
         }
         pagesByYear[year].push({ page, hasThumb });
-    });
+    }
 
-    // Сортируем годы (новые — вверху) и страницы внутри года
     const sortedYears = Object.keys(pagesByYear)
         .map(y => parseInt(y, 10))
-        .sort((a, b) => b - a); // От новых к старым
+        .sort((a, b) => b - a);
 
     const groupedPages = {};
     sortedYears.forEach(year => {
-        groupedPages[year] = pagesByYear[year].sort((a, b) => a.page - b.page); // По возрастанию номера страницы
+        groupedPages[year] = pagesByYear[year].sort((a, b) => a.page - b.page);
     });
 
-    // ✅ Инициализируем обычный список страниц
     pages = htmlFiles.map(file => {
         const pageStr = file.replace('.html', '');
         const page = parseInt(pageStr, 10);
-        const hasThumb = fs.existsSync(path.join(fullPath, `${pageStr}.png`));
+        const pngPath = path.join(fullPath, `${pageStr}.png`);
+        const hasThumb = fsSync.existsSync(pngPath);
         return { page, hasThumb };
     }).filter(p => !isNaN(p.page) && p.page >= 100 && p.page <= 999);
 
-    // ✅ Группировка подпапок по годам (для отображения в folder.ejs)
     const foldersByYear = {};
     folders.forEach(folder => {
-        let year = 0; // Если год не найден — будет 0
-
-        // Ищем год в имени папки (например, "1KANAL 01.12.2006" -> 2006, "Channel 95" -> 1995)
+        let year = 0;
         const dateMatch = folder.match(/(\d{2}|\d{4})$/);
         if (dateMatch) {
             const yearPart = dateMatch[1];
             if (yearPart.length === 4) {
-                year = parseInt(yearPart, 10); // 1995, 2003...
+                year = parseInt(yearPart, 10);
             } else if (yearPart.length === 2) {
                 const num = parseInt(yearPart, 10);
-                // Превращаем 95 в 1995, 03 в 2003
-                year = num > 25 ? 1900 + num : 2000 + num; // Условно: 26-99 -> 19xx, 00-25 -> 20xx
+                year = num > 25 ? 1900 + num : 2000 + num;
             }
         }
 
@@ -258,47 +436,52 @@ app.get('/folder/*', async (req, res) => {
         foldersByYear[year].push(folder);
     });
 
-    // Сортируем годы (новые — вверху) и папки внутри года
     const sortedFolderYears = Object.keys(foldersByYear)
         .map(y => parseInt(y, 10))
-        .sort((a, b) => b - a); // От новых к старым
+        .sort((a, b) => b - a);
 
     const groupedFolders = {};
     sortedFolderYears.forEach(year => {
-        groupedFolders[year] = foldersByYear[year].sort(); // По алфавиту
+        groupedFolders[year] = foldersByYear[year].sort();
     });
 
     const pathParts = decodedPath.split('/').filter(Boolean);
-    const breadcrumb = pathParts.map((part, i) => ({ name: part, path: pathParts.slice(0, i + 1).join('/') }));
+    const breadcrumb = pathParts.map((part, i) => ({
+        name: part,
+        path: pathParts.slice(0, i + 1).join('/')
+    }));
 
-    const logoExists = fs.existsSync(path.join(fullPath, 'logo.svg'));
-    const logoExistsPng = fs.existsSync(path.join(fullPath, 'logo.png'));
-    const logoUrl = logoExists ? `/teletext/${decodedPath}/logo.svg` : logoExistsPng ? `/teletext/${decodedPath}/logo.png` : null;
+    const logoSvgPath = path.join(fullPath, 'logo.svg');
+    const logoPngPath = path.join(fullPath, 'logo.png');
+    const logoExists = await fs.access(logoSvgPath).then(() => true).catch(() => false);
+    const logoExistsPng = await fs.access(logoPngPath).then(() => true).catch(() => false);
+    const logoUrl = logoExists
+        ? `/teletext/${decodedPath}/logo.svg`
+        : logoExistsPng
+            ? `/teletext/${decodedPath}/logo.png`
+            : null;
 
     const folderCards = {};
-    folders.forEach(folder => {
+    await Promise.all(folders.map(async folder => {
         const folderPath = path.join(fullPath, folder);
-        const hasSvg = fs.existsSync(path.join(folderPath, 'logo.svg'));
-        const hasPng = fs.existsSync(path.join(folderPath, 'logo.png'));
+        const hasSvg = await fs.access(path.join(folderPath, 'logo.svg')).then(() => true).catch(() => false);
+        const hasPng = await fs.access(path.join(folderPath, 'logo.png')).then(() => true).catch(() => false);
 
         let displayName = folder;
         const titleFile = path.join(folderPath, 'title.txt');
-        if (fs.existsSync(titleFile)) {
-            try {
-                displayName = fs.readFileSync(titleFile, 'utf-8').trim() || folder;
-            } catch (e) {
-                logAction('TITLE_READ_WARN', `Не удалось прочитать title.txt в ${folder}`);
-            }
+        try {
+            const titleContent = await fs.readFile(titleFile, 'utf-8');
+            displayName = titleContent.trim() || folder;
+        } catch (e) {
+            // Файл не существует
         }
 
         let description = '';
         const descFile = path.join(folderPath, 'description.txt');
-        if (fs.existsSync(descFile)) {
-            try {
-                description = fs.readFileSync(descFile, 'utf-8').trim();
-            } catch (e) {
-                logAction('DESC_READ_WARN', `Не удалось прочитать description.txt в ${folder}`);
-            }
+        try {
+            description = await fs.readFile(descFile, 'utf-8').then(d => d.trim());
+        } catch (e) {
+            // Файл не существует
         }
 
         folderCards[folder] = {
@@ -310,9 +493,8 @@ app.get('/folder/*', async (req, res) => {
             displayName,
             description
         };
-    });
+    }));
 
-    // --- Шаг 4: Рендер шаблона ---
     res.render('folder', {
         folderName: path.basename(fullPath) || 'Телетекст',
         currentPath: decodedPath,
@@ -326,40 +508,72 @@ app.get('/folder/*', async (req, res) => {
         folderCards,
         disableCopy: true
     });
-});
+}));
 
 // 📄 Страница
-app.get('/page/*/:page', async (req, res) => {
+app.get('/page/*/:page', asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
     const pageParam = req.params.page;
 
     let decodedPath = requestedPath;
 
-    if (!isValidPath(decodedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
+    if (!isValidPath(decodedPath)) {
+        throw new AppError('Недопустимый путь', 400);
+    }
 
     const page = parseInt(pageParam, 10);
-    if (isNaN(page) || page < 100 || page > 999) return res.status(400).render('error', { message: 'Некорректный номер страницы (100–999)' });
+    if (isNaN(page) || page < 100 || page > 999) {
+        throw new AppError('Некорректный номер страницы (100–999)', 400);
+    }
 
     const fullPath = path.join(__dirname, 'teletext', decodedPath);
     const htmlFile = path.join(fullPath, `${page}.html`);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) return res.status(404).render('error', { message: 'Архив не найден' });
-    if (!fs.existsSync(htmlFile)) return res.status(404).render('error', { message: `Страница ${page} не найдена` });
 
-    const files = fs.readdirSync(fullPath).filter(f => f.endsWith('.html'));
-    const pageNumbers = files.map(f => parseInt(f.replace('.html', ''), 10)).filter(n => !isNaN(n) && n >= 100 && n <= 999).sort((a, b) => a - b);
+    const stats = await fs.stat(fullPath).catch(() => null);
+    if (!stats || !stats.isDirectory()) {
+        throw new AppError('Архив не найден', 404);
+    }
+
+    const htmlExists = await fs.access(htmlFile).then(() => true).catch(() => false);
+    if (!htmlExists) {
+        throw new AppError(`Страница ${page} не найдена`, 404);
+    }
+
+    const files = await fs.readdir(fullPath);
+    const htmlFilesOnly = files.filter(f => f.endsWith('.html'));
+    const pageNumbers = htmlFilesOnly
+        .map(f => parseInt(f.replace('.html', ''), 10))
+        .filter(n => !isNaN(n) && n >= 100 && n <= 999)
+        .sort((a, b) => a - b);
+
     const currentIndex = pageNumbers.indexOf(page);
     const prevPage = currentIndex > 0 ? pageNumbers[currentIndex - 1] : null;
     const nextPage = currentIndex < pageNumbers.length - 1 ? pageNumbers[currentIndex + 1] : null;
 
-    const content = fs.readFileSync(htmlFile, 'utf-8');
+    const content = await fs.readFile(htmlFile, 'utf-8');
     const pathParts = decodedPath.split('/').filter(Boolean);
-    const breadcrumb = pathParts.map((part, i) => ({ name: part, path: pathParts.slice(0, i + 1).join('/') }));
-    const pageList = pageNumbers.map(p => ({ page: p, hasThumb: fs.existsSync(path.join(fullPath, `${p}.png`)) }));
+    const breadcrumb = pathParts.map((part, i) => ({
+        name: part,
+        path: pathParts.slice(0, i + 1).join('/')
+    }));
+
+    const pageList = await Promise.all(pageNumbers.map(async p => {
+        const pngPath = path.join(fullPath, `${p}.png`);
+        const hasThumb = await fs.access(pngPath).then(() => true).catch(() => false);
+        return { page: p, hasThumb };
+    }));
+
     const basePath = `/teletext/${decodedPath}/`;
 
-    const logoExists = fs.existsSync(path.join(fullPath, 'logo.svg'));
-    const logoExistsPng = fs.existsSync(path.join(fullPath, 'logo.png'));
-    const logoUrl = logoExists ? `/teletext/${decodedPath}/logo.svg` : logoExistsPng ? `/teletext/${decodedPath}/logo.png` : null;
+    const logoSvgPath = path.join(fullPath, 'logo.svg');
+    const logoPngPath = path.join(fullPath, 'logo.png');
+    const logoExists = await fs.access(logoSvgPath).then(() => true).catch(() => false);
+    const logoExistsPng = await fs.access(logoPngPath).then(() => true).catch(() => false);
+    const logoUrl = logoExists
+        ? `/teletext/${decodedPath}/logo.svg`
+        : logoExistsPng
+            ? `/teletext/${decodedPath}/logo.png`
+            : null;
 
     res.render('page', {
         pageNumber: page,
@@ -375,43 +589,49 @@ app.get('/page/*/:page', async (req, res) => {
         logoUrl,
         disableCopy: true
     });
-});
+}));
 
 // ✨ Редактор карточки
-app.get('/edit-card/*', (req, res) => {
+app.get('/edit-card/*', asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
     let decodedPath = requestedPath;
 
-    if (!isValidPath(decodedPath)) return res.status(400).render('error', { message: 'Недопустимый путь' });
+    if (!isValidPath(decodedPath)) {
+        throw new AppError('Недопустимый путь', 400);
+    }
 
     const fullPath = path.join(__dirname, 'teletext', decodedPath);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
-        return res.status(404).render('error', { message: 'Папка не найдена' });
+    const stats = await fs.stat(fullPath).catch(() => null);
+    if (!stats || !stats.isDirectory()) {
+        throw new AppError('Папка не найдена', 404);
     }
 
     let title = path.basename(decodedPath);
     const titleFile = path.join(fullPath, 'title.txt');
-    if (fs.existsSync(titleFile)) {
-        try {
-            title = fs.readFileSync(titleFile, 'utf-8').trim();
-        } catch (err) {
-            logAction('TITLE_READ_ERROR', `${titleFile}: ${err.message}`);
-        }
+    try {
+        const titleContent = await fs.readFile(titleFile, 'utf-8');
+        title = titleContent.trim();
+    } catch (err) {
+        // Файл не существует
     }
 
     let description = '';
     const descFile = path.join(fullPath, 'description.txt');
-    if (fs.existsSync(descFile)) {
-        try {
-            description = fs.readFileSync(descFile, 'utf-8').trim();
-        } catch (err) {
-            logAction('DESC_READ_ERROR', `${descFile}: ${err.message}`);
-        }
+    try {
+        description = await fs.readFile(descFile, 'utf-8').then(d => d.trim());
+    } catch (err) {
+        // Файл не существует
     }
 
-    const logoExists = fs.existsSync(path.join(fullPath, 'logo.svg'));
-    const logoExistsPng = fs.existsSync(path.join(fullPath, 'logo.png'));
-    const logoUrl = logoExists ? `/teletext/${decodedPath}/logo.svg` : logoExistsPng ? `/teletext/${decodedPath}/logo.png` : null;
+    const logoSvgPath = path.join(fullPath, 'logo.svg');
+    const logoPngPath = path.join(fullPath, 'logo.png');
+    const logoExists = await fs.access(logoSvgPath).then(() => true).catch(() => false);
+    const logoExistsPng = await fs.access(logoPngPath).then(() => true).catch(() => false);
+    const logoUrl = logoExists
+        ? `/teletext/${decodedPath}/logo.svg`
+        : logoExistsPng
+            ? `/teletext/${decodedPath}/logo.png`
+            : null;
 
     res.render('edit-card', {
         archivePath: decodedPath,
@@ -422,108 +642,100 @@ app.get('/edit-card/*', (req, res) => {
         logoUrl,
         disableCopy: true
     });
-});
+}));
 
-// 💾 Сохранение логотипа + названия + описания + переименование папки в название канала
-app.post('/save-card/*', upload.single('logo'), async (req, res) => {
+// 💾 Сохранение карточки (продолжение)
+app.post('/save-card/*', upload.single('logo'), asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
     let decodedPath = requestedPath;
 
     if (!isValidPath(decodedPath)) {
-        logAction('CARD_SAVE_FAIL', 'Недопустимый путь');
-        return res.status(400).render('error', { message: 'Недопустимый путь' });
+        throw new AppError('Недопустимый путь', 400);
     }
 
     const fullPath = path.join(__dirname, 'teletext', decodedPath);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
-        logAction('CARD_SAVE_FAIL', `Папка не найдена: ${requestedPath}`);
-        return res.status(404).render('error', { message: 'Папка не найдена' });
+    const stats = await fs.stat(fullPath).catch(() => null);
+    if (!stats || !stats.isDirectory()) {
+        throw new AppError('Папка не найдена', 404);
     }
 
     const newTitle = (req.body.title || '').trim();
     const newDescription = (req.body.description || '').trim();
 
     if (!newTitle) {
-        logAction('CARD_SAVE_FAIL', 'Пустое название');
         return res.redirect(`/edit-card/${decodedPath}`);
     }
 
-    // --- Шаг 1: Переименование папки ---
-    let finalPathAfterRename = decodedPath; // Путь после возможного переименования
+    let finalPathAfterRename = decodedPath;
 
     if (newTitle !== path.basename(decodedPath)) {
         const parentDir = path.dirname(fullPath);
         const newFolderPath = path.join(parentDir, newTitle);
 
-        if (fs.existsSync(newFolderPath)) {
-            logAction('CARD_SAVE_FAIL', `Папка уже существует: ${newFolderPath}`);
-            return res.status(400).render('error', { message: `Папка '${newTitle}' уже существует` });
+        const newFolderExists = await fs.access(newFolderPath).then(() => true).catch(() => false);
+        if (newFolderExists) {
+            throw new AppError(`Папка '${newTitle}' уже существует`, 400);
         }
 
         try {
-            // Попытка переименования с повторами (EPERM fix)
             const maxRetries = 3;
             let success = false;
             for (let i = 0; i < maxRetries; i++) {
                 try {
-                    fs.renameSync(fullPath, newFolderPath);
+                    await fs.rename(fullPath, newFolderPath);
                     success = true;
                     logAction('FOLDER_RENAMED', `${fullPath} -> ${newFolderPath}`);
                     break;
                 } catch (renameErr) {
                     if (renameErr.code === 'EPERM' && i < maxRetries - 1) {
                         logAction('FOLDER_RENAME_RETRY', `${decodedPath}: попытка ${i + 1} из ${maxRetries} (EPERM)`);
-                        await new Promise(resolve => setTimeout(resolve, 1000)); // Задержка 1 секунда
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                     } else {
-                        throw renameErr; // Прерываем цикл, если не EPERM или последняя попытка
+                        throw renameErr;
                     }
                 }
             }
 
             if (!success) {
-                throw new Error(`Не удалось переименовать после ${maxRetries} попыток`);
+                throw new AppError(`Не удалось переименовать после ${maxRetries} попыток`, 500);
             }
 
-            // Обновляем finalPathAfterRename
-            finalPathAfterRename = path.join(path.dirname(decodedPath), newTitle).replace(/^\/+/, ''); // Убираем начальный слэш, если есть
+            finalPathAfterRename = path.join(path.dirname(decodedPath), newTitle).replace(/^\/+/, '');
 
         } catch (renameErr) {
             logAction('FOLDER_RENAME_ERROR', `${decodedPath}: ${renameErr.message}`);
-            // Проверяем, была ли ошибка EPERM
             if (renameErr.code === 'EPERM') {
-                return res.status(500).render('error', { message: `Ошибка переименования: операция запрещена. Убедитесь, что папка не используется другим процессом (антивирус, проводник и т.д.). Попробуйте закрыть все программы, работающие с этой папкой, и сохранить снова.` });
+                throw new AppError('Ошибка переименования: операция запрещена. Убедитесь, что папка не используется другим процессом.', 500);
             } else {
-                return res.status(500).render('error', { message: `Ошибка переименования папки: ${renameErr.message}` });
+                throw renameErr;
             }
         }
     }
 
-    // --- Шаг 2: Обновление файлов в новой (или старой) папке ---
     const finalFullDirPath = path.join(__dirname, 'teletext', finalPathAfterRename);
 
-    // Обновление title.txt
     const titleFile = path.join(finalFullDirPath, 'title.txt');
     try {
-        fs.writeFileSync(titleFile, newTitle, 'utf-8');
+        await fs.writeFile(titleFile, newTitle, 'utf-8');
         logAction('TITLE_SAVED', `${newTitle} -> ${finalPathAfterRename}`);
     } catch (err) {
         logAction('TITLE_SAVE_ERROR', `${finalPathAfterRename}: ${err.message}`);
     }
 
-    // Обновление description.txt
     if (newDescription) {
         const descFile = path.join(finalFullDirPath, 'description.txt');
         try {
-            fs.writeFileSync(descFile, newDescription, 'utf-8');
+            await fs.writeFile(descFile, newDescription, 'utf-8');
             logAction('DESC_SAVED', `${newDescription.substring(0, 20)}... -> ${finalPathAfterRename}`);
         } catch (err) {
             logAction('DESC_SAVE_ERROR', `${finalPathAfterRename}: ${err.message}`);
         }
     } else {
         const descFile = path.join(finalFullDirPath, 'description.txt');
-        if (fs.existsSync(descFile)) {
+        const descExists = await fs.access(descFile).then(() => true).catch(() => false);
+        if (descExists) {
             try {
-                fs.unlinkSync(descFile);
+                await fs.unlink(descFile);
                 logAction('DESC_DELETED', `description.txt удален из ${finalPathAfterRename}`);
             } catch (err) {
                 logAction('DESC_DELETE_ERROR', `${finalPathAfterRename}: ${err.message}`);
@@ -531,49 +743,49 @@ app.post('/save-card/*', upload.single('logo'), async (req, res) => {
         }
     }
 
-    // --- Шаг 3: Обновление логотипа ---
     if (req.file) {
         const targetName = req.file.originalname.toLowerCase().endsWith('.svg') ? 'logo.svg' : 'logo.png';
         const targetPath = path.join(finalFullDirPath, targetName);
         try {
-            fs.copyFileSync(req.file.path, targetPath);
-            fs.unlinkSync(req.file.path);
+            await fs.copyFile(req.file.path, targetPath);
+            await fs.unlink(req.file.path);
             logAction('LOGO_UPLOADED', `${targetName} -> ${finalPathAfterRename}`);
         } catch (err) {
             logAction('LOGO_UPLOAD_ERROR', `${finalPathAfterRename}: ${err.message}`);
         }
     }
 
-    // --- Шаг 4: Редирект ---
     res.redirect(`/folder/${finalPathAfterRename}`);
-});
+}));
 
 // 🗑 Удаление логотипа
-app.post('/logo-delete/*', (req, res) => {
+app.post('/logo-delete/*', asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
     let decodedPath = requestedPath;
 
     if (!isValidPath(decodedPath)) {
-        logAction('LOGO_DELETE_FAIL', 'Недопустимый путь');
-        return res.status(400).render('error', { message: 'Недопустимый путь' });
+        throw new AppError('Недопустимый путь', 400);
     }
 
     const fullPath = path.join(__dirname, 'teletext', decodedPath);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
-        logAction('LOGO_DELETE_FAIL', `Папка не найдена: ${requestedPath}`);
-        return res.status(404).render('error', { message: 'Папка не найдена' });
+    const stats = await fs.stat(fullPath).catch(() => null);
+    if (!stats || !stats.isDirectory()) {
+        throw new AppError('Папка не найдена', 404);
     }
 
     const logoSvg = path.join(fullPath, 'logo.svg');
     const logoPng = path.join(fullPath, 'logo.png');
     let deleted = [];
 
-    if (fs.existsSync(logoSvg)) {
-        fs.unlinkSync(logoSvg);
+    const svgExists = await fs.access(logoSvg).then(() => true).catch(() => false);
+    if (svgExists) {
+        await fs.unlink(logoSvg);
         deleted.push('logo.svg');
     }
-    if (fs.existsSync(logoPng)) {
-        fs.unlinkSync(logoPng);
+
+    const pngExists = await fs.access(logoPng).then(() => true).catch(() => false);
+    if (pngExists) {
+        await fs.unlink(logoPng);
         deleted.push('logo.png');
     }
 
@@ -582,41 +794,48 @@ app.post('/logo-delete/*', (req, res) => {
     }
 
     res.redirect(`/edit-card/${decodedPath}`);
-});
+}));
 
-// 📁 Файловый менеджер с подпапками
-app.get('/manager/*', (req, res) => {
+// 📁 Файловый менеджер
+app.get('/manager/*', asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
     let decodedPath = requestedPath;
 
     if (!isValidPath(decodedPath)) {
-        return res.status(400).render('error', { message: 'Недопустимый путь' });
+        throw new AppError('Недопустимый путь', 400);
     }
 
     const fullPath = path.join(__dirname, 'teletext', decodedPath);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
-        return res.status(404).render('error', { message: 'Папка не найдена' });
+    const stats = await fs.stat(fullPath).catch(() => null);
+    if (!stats || !stats.isDirectory()) {
+        throw new AppError('Папка не найдена', 404);
     }
 
-    const items = fs.readdirSync(fullPath);
+    const items = await fs.readdir(fullPath);
     const folders = [];
     const files = [];
 
-    items.forEach(item => {
+    await Promise.all(items.map(async item => {
         const itemPath = path.join(fullPath, item);
-        if (fs.statSync(itemPath).isDirectory()) {
-            const subItems = fs.readdirSync(itemPath);
+        const itemStats = await fs.stat(itemPath);
+
+        if (itemStats.isDirectory()) {
+            const subItems = await fs.readdir(itemPath);
             const isEmpty = subItems.length === 0;
-            folders.push({ name: item, path: decodedPath ? `${decodedPath}/${item}` : item, isEmpty });
+            folders.push({
+                name: item,
+                path: decodedPath ? `${decodedPath}/${item}` : item,
+                isEmpty
+            });
         } else {
             files.push({
                 name: item,
-                size: fs.statSync(itemPath).size,
+                size: itemStats.size,
                 url: `/teletext/${decodedPath ? encodeURIComponent(decodedPath) + '/' : ''}${encodeURIComponent(item)}`,
                 ext: path.extname(item).toLowerCase()
             });
         }
-    });
+    }));
 
     const pathParts = decodedPath.split('/').filter(Boolean);
     const breadcrumb = pathParts.map((part, i) => ({
@@ -631,7 +850,7 @@ app.get('/manager/*', (req, res) => {
         breadcrumb,
         disableCopy: true
     });
-});
+}));
 
 // 📁 Главная страница менеджера
 app.get('/manager', (req, res) => {
@@ -639,7 +858,7 @@ app.get('/manager', (req, res) => {
 });
 
 // ✅ Создать папку
-app.post('/create-folder/*', (req, res) => {
+app.post('/create-folder/*', asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
     const { name } = req.body;
 
@@ -656,27 +875,29 @@ app.post('/create-folder/*', (req, res) => {
         .replace(/\s+/g, '_');
 
     const fullPath = path.join(__dirname, 'teletext', requestedPath);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+    const stats = await fs.stat(fullPath).catch(() => null);
+    if (!stats || !stats.isDirectory()) {
         return res.status(404).json({ error: 'Папка не найдена' });
     }
 
     const dirPath = path.join(fullPath, cleanName);
 
-    if (fs.existsSync(dirPath)) {
+    const dirExists = await fs.access(dirPath).then(() => true).catch(() => false);
+    if (dirExists) {
         return res.status(400).json({ error: 'Папка уже существует' });
     }
 
     try {
-        fs.mkdirSync(dirPath, { recursive: true });
+        await fs.mkdir(dirPath, { recursive: true });
         logAction('FOLDER_CREATED', `teletext/${requestedPath ? requestedPath + '/' : ''}${cleanName}`);
         res.json({ success: true, name: cleanName });
     } catch (err) {
-        res.status(500).json({ error: `Не удалось создать: ${err.message}` });
+        throw new AppError(`Не удалось создать: ${err.message}`, 500);
     }
-});
+}));
 
-// ✅ Удалить файл или папку (с содержимым)
-app.post('/delete-item/*', (req, res) => {
+// ✅ Удалить файл или папку
+app.post('/delete-item/*', asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
     const { name, type } = req.body;
 
@@ -691,26 +912,27 @@ app.post('/delete-item/*', (req, res) => {
     const cleanName = path.basename(name);
     const fullPath = path.join(__dirname, 'teletext', requestedPath, cleanName);
 
-    if (!fs.existsSync(fullPath)) {
+    const itemExists = await fs.access(fullPath).then(() => true).catch(() => false);
+    if (!itemExists) {
         return res.status(404).json({ error: 'Объект не найден' });
     }
 
     try {
         if (type === 'file') {
-            fs.unlinkSync(fullPath);
+            await fs.unlink(fullPath);
             logAction('FILE_DELETED', `teletext/${requestedPath ? requestedPath + '/' : ''}${cleanName}`);
         } else if (type === 'folder') {
-            fs.rmSync(fullPath, { recursive: true, force: true });
+            await fs.rm(fullPath, { recursive: true, force: true });
             logAction('FOLDER_DELETED', `teletext/${requestedPath ? requestedPath + '/' : ''}${cleanName}`);
         }
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: `Ошибка: ${err.message}` });
+        throw new AppError(`Ошибка удаления: ${err.message}`, 500);
     }
-});
+}));
 
 // ✅ Переименовать файл или папку
-app.post('/rename-item/*', (req, res) => {
+app.post('/rename-item/*', asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
     const { oldName, newName, type } = req.body;
 
@@ -723,53 +945,52 @@ app.post('/rename-item/*', (req, res) => {
     const sourcePath = path.join(__dirname, 'teletext', requestedPath, cleanOldName);
     const targetPath = path.join(__dirname, 'teletext', requestedPath, cleanNewName);
 
-    if (!fs.existsSync(sourcePath)) {
+    const sourceExists = await fs.access(sourcePath).then(() => true).catch(() => false);
+    if (!sourceExists) {
         return res.status(404).json({ error: 'Объект не найден' });
     }
 
-    if (fs.existsSync(targetPath)) {
+    const targetExists = await fs.access(targetPath).then(() => true).catch(() => false);
+    if (targetExists) {
         return res.status(400).json({ error: 'Объект с таким именем уже существует' });
     }
 
     try {
-        // Попытка переименования с повторами (EPERM fix)
         const maxRetries = 3;
         let success = false;
         for (let i = 0; i < maxRetries; i++) {
             try {
-                fs.renameSync(sourcePath, targetPath);
+                await fs.rename(sourcePath, targetPath);
                 success = true;
                 logAction('ITEM_RENAMED', `${type} ${sourcePath} -> ${targetPath}`);
                 break;
             } catch (renameErr) {
                 if (renameErr.code === 'EPERM' && i < maxRetries - 1) {
                     logAction('ITEM_RENAME_RETRY', `${requestedPath}/${cleanOldName}: попытка ${i + 1} из ${maxRetries} (EPERM)`);
-                    // Задержка перед повторной попыткой
-                    const start = Date.now();
-                    while (Date.now() - start < 1000);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                 } else {
-                    throw renameErr; // Прерываем цикл, если не EPERM или последняя попытка
+                    throw renameErr;
                 }
             }
         }
 
         if (!success) {
-            throw new Error(`Не удалось переименовать после ${maxRetries} попыток`);
+            throw new AppError(`Не удалось переименовать после ${maxRetries} попыток`, 500);
         }
 
         res.json({ success: true });
     } catch (err) {
         logAction('ITEM_RENAME_ERROR', `${requestedPath}/${cleanOldName}: ${err.message}`);
         if (err.code === 'EPERM') {
-            return res.status(500).json({ error: `Ошибка переименования: операция запрещена. Убедитесь, что объект не используется другим процессом.` });
+            return res.status(500).json({ error: 'Ошибка переименования: операция запрещена. Убедитесь, что объект не используется другим процессом.' });
         } else {
-            return res.status(500).json({ error: `Ошибка переименования: ${err.message}` });
+            throw err;
         }
     }
-});
+}));
 
 // ✅ Переместить файл или папку
-app.post('/move-item/*', (req, res) => {
+app.post('/move-item/*', asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
     const { itemName, targetPath, type } = req.body;
 
@@ -787,34 +1008,37 @@ app.post('/move-item/*', (req, res) => {
     const targetDirPath = path.join(__dirname, 'teletext', finalTargetPath);
     const targetItemPath = path.join(targetDirPath, cleanItemName);
 
-    if (!fs.existsSync(sourcePath)) {
+    const sourceExists = await fs.access(sourcePath).then(() => true).catch(() => false);
+    if (!sourceExists) {
         return res.status(404).json({ error: 'Объект не найден' });
     }
 
-    if (!fs.existsSync(targetDirPath) || !fs.statSync(targetDirPath).isDirectory()) {
+    const targetDirStats = await fs.stat(targetDirPath).catch(() => null);
+    if (!targetDirStats || !targetDirStats.isDirectory()) {
         return res.status(404).json({ error: 'Папка назначения не найдена' });
     }
 
-    if (fs.existsSync(targetItemPath)) {
+    const targetItemExists = await fs.access(targetItemPath).then(() => true).catch(() => false);
+    if (targetItemExists) {
         return res.status(400).json({ error: 'Объект с таким именем уже существует в папке назначения' });
     }
 
     try {
-        fs.renameSync(sourcePath, targetItemPath);
+        await fs.rename(sourcePath, targetItemPath);
         logAction('ITEM_MOVED', `${type} ${sourcePath} -> ${targetItemPath}`);
         res.json({ success: true });
     } catch (err) {
         logAction('ITEM_MOVE_ERROR', `${requestedPath}/${cleanItemName} -> ${finalTargetPath}: ${err.message}`);
         if (err.code === 'EPERM') {
-            return res.status(500).json({ error: `Ошибка перемещения: операция запрещена. Убедитесь, что объект не используется другим процессом.` });
+            return res.status(500).json({ error: 'Ошибка перемещения: операция запрещена. Убедитесь, что объект не используется другим процессом.' });
         } else {
-            return res.status(500).json({ error: `Ошибка перемещения: ${err.message}` });
+            throw err;
         }
     }
-});
+}));
 
-// ✅ Загрузка файлов (включая папки через drag’n’drop)
-app.post('/upload/*', uploadFiles.any(), async (req, res) => {
+// ✅ Загрузка файлов
+app.post('/upload/*', uploadFiles.any(), asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
 
     if (!isValidPath(requestedPath)) {
@@ -822,7 +1046,8 @@ app.post('/upload/*', uploadFiles.any(), async (req, res) => {
     }
 
     const fullPath = path.join(__dirname, 'teletext', requestedPath);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+    const stats = await fs.stat(fullPath).catch(() => null);
+    if (!stats || !stats.isDirectory()) {
         return res.status(404).json({ error: 'Папка не найдена' });
     }
 
@@ -846,8 +1071,8 @@ app.post('/upload/*', uploadFiles.any(), async (req, res) => {
 
             const targetPath = path.join(fullPath, targetName);
 
-            fs.copyFileSync(file.path, targetPath);
-            fs.unlinkSync(file.path);
+            await fs.copyFile(file.path, targetPath);
+            await fs.unlink(file.path);
             saved.push(targetName);
             logAction('FILE_UPLOADED', `${targetName} → teletext/${requestedPath ? requestedPath + '/' : ''}`);
         } catch (err) {
@@ -860,10 +1085,10 @@ app.post('/upload/*', uploadFiles.any(), async (req, res) => {
     }
 
     res.json({ success: true, saved });
-});
+}));
 
-// ✅ Перегенерация всех превьюшек в папке (250x250) с реальным прогрессом через SSE
-app.get('/regenerate-thumbnails-stream/*', async (req, res) => {
+// ✅ Перегенерация превью (SSE)
+app.get('/regenerate-thumbnails-stream/*', asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
     let decodedPath = requestedPath;
 
@@ -872,18 +1097,19 @@ app.get('/regenerate-thumbnails-stream/*', async (req, res) => {
     }
 
     const fullPath = path.join(__dirname, 'teletext', decodedPath);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+    const stats = await fs.stat(fullPath).catch(() => null);
+    if (!stats || !stats.isDirectory()) {
         return res.status(404).json({ error: 'Папка не найдена' });
     }
 
-    const htmlFiles = fs.readdirSync(fullPath).filter(f => f.endsWith('.html'));
+    const items = await fs.readdir(fullPath);
+    const htmlFiles = items.filter(f => f.endsWith('.html'));
     const totalFiles = htmlFiles.length;
 
     if (totalFiles === 0) {
         return res.json({ success: true, message: 'Нет HTML-файлов для генерации превьюшек' });
     }
 
-    // Устанавливаем SSE-заголовки
     res.writeHead(200, {
         'Content-Type': 'text/plain',
         'Connection': 'keep-alive',
@@ -903,11 +1129,10 @@ app.get('/regenerate-thumbnails-stream/*', async (req, res) => {
         const pngPath = path.join(fullPath, `${page}.png`);
 
         try {
-            await generateThumbnail(htmlPath, pngPath); // Функция уже масштабирует до 250x250
+            await generateThumbnail(htmlPath, pngPath);
             generated.push(`${page}.png`);
             logAction('THUMBNAIL_REGENERATED', pngPath);
 
-            // Отправляем прогресс в реальном времени
             const progress = Math.round(((i + 1) / totalFiles) * 100);
             const data = {
                 progress,
@@ -916,7 +1141,6 @@ app.get('/regenerate-thumbnails-stream/*', async (req, res) => {
                 generated: [`${page}.png`]
             };
             res.write(`data: ${JSON.stringify(data)}\n\n`);
-            res.flushHeaders(); // Отправляем заголовки (если поддерживается)
         } catch (err) {
             errors.push(`${file}: ${err.message}`);
             logAction('THUMBNAIL_REGEN_ERROR', `${pngPath}: ${err.message}`);
@@ -932,10 +1156,10 @@ app.get('/regenerate-thumbnails-stream/*', async (req, res) => {
 
     res.write(`data: ${JSON.stringify(finalData)}\n\n`);
     res.end();
-});
+}));
 
-// ✅ Оптимизированная перегенерация всех превьюшек в папке (250x250) через workers (маршрут для manager.ejs)
-app.post('/manager/regenerate-thumbnails-fast/*', async (req, res) => {
+// ✅ Быстрая перегенерация превью (для manager.ejs)
+app.post('/manager/regenerate-thumbnails-fast/*', asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
     let decodedPath = requestedPath;
 
@@ -944,20 +1168,19 @@ app.post('/manager/regenerate-thumbnails-fast/*', async (req, res) => {
     }
 
     const fullPath = path.join(__dirname, 'teletext', decodedPath);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+    const stats = await fs.stat(fullPath).catch(() => null);
+    if (!stats || !stats.isDirectory()) {
         return res.status(404).json({ error: 'Папка не найдена' });
     }
 
-
-
-    const htmlFiles = fs.readdirSync(fullPath).filter(f => f.endsWith('.html'));
+    const items = await fs.readdir(fullPath);
+    const htmlFiles = items.filter(f => f.endsWith('.html'));
     const totalFiles = htmlFiles.length;
 
     if (totalFiles === 0) {
         return res.json({ success: true, message: 'Нет HTML-файлов для генерации превьюшек' });
     }
 
-    // Устанавливаем SSE-заголовки
     res.writeHead(200, {
         'Content-Type': 'text/plain',
         'Connection': 'keep-alive',
@@ -967,7 +1190,6 @@ app.post('/manager/regenerate-thumbnails-fast/*', async (req, res) => {
     const errors = [];
     const generated = [];
 
-    // --- Твой код с workers ---
     const MAX_CONCURRENT_PAGES = 5;
     let browser;
 
@@ -1001,9 +1223,9 @@ app.post('/manager/regenerate-thumbnails-fast/*', async (req, res) => {
                 const pageNum = parseInt(pageStr, 10);
                 if (isNaN(pageNum) || pageNum < 100 || pageNum > 999) {
                     completed++;
-                    if (completed % 5 === 0 || completed === totalFiles) { // Отправляем прогресс каждые 5 файлов или в конце
+                    if (completed % 5 === 0 || completed === totalFiles) {
                         const progress = Math.round((completed / totalFiles) * 100);
-                        res.write(` ${JSON.stringify({ progress, current: completed, total: totalFiles, generated: [] })}\n\n`);
+                        res.write(`${JSON.stringify({ progress, current: completed, total: totalFiles, generated: [] })}\n\n`);
                     }
                     continue;
                 }
@@ -1013,13 +1235,14 @@ app.post('/manager/regenerate-thumbnails-fast/*', async (req, res) => {
 
                 try {
                     await page.goto(`file://${htmlPath}`, { waitUntil: 'networkidle2', timeout: 15000 });
-                    await page.screenshot({ path: pngPath, type: 'png', fullPage: true });
+                    const buffer = await page.screenshot({ type: 'png', fullPage: true });
 
-                    const buffer = fs.readFileSync(pngPath);
                     const resizedBuffer = await sharp(buffer)
                         .resize(250, 250, { fit: 'cover', position: 'center' })
+                        .png({ quality: 80, palette: true, dither: 0.5 })
                         .toBuffer();
-                    fs.writeFileSync(pngPath, resizedBuffer);
+
+                    await fs.writeFile(pngPath, resizedBuffer);
                     generated.push(`${pageNum}.png`);
                     logAction('THUMBNAIL_GENERATED_250x250', pngPath);
                 } catch (err) {
@@ -1028,10 +1251,9 @@ app.post('/manager/regenerate-thumbnails-fast/*', async (req, res) => {
                 }
 
                 completed++;
-                if (completed % 5 === 0 || completed === totalFiles) { // Отправляем прогресс каждые 5 файлов или в конце
+                if (completed % 5 === 0 || completed === totalFiles) {
                     const progress = Math.round((completed / totalFiles) * 100);
-                    res.write(` ${JSON.stringify({ progress, current: completed, total: totalFiles, generated: [`${pageNum}.png`] })}\n\n`);
-                    res.flushHeaders(); // Отправляем заголовки (если поддерживается)
+                    res.write(`${JSON.stringify({ progress, current: completed, total: totalFiles, generated: [`${pageNum}.png`] })}\n\n`);
                 }
             }
             await page.close();
@@ -1049,16 +1271,36 @@ app.post('/manager/regenerate-thumbnails-fast/*', async (req, res) => {
         message: 'Все превьюшки обновлены!'
     };
 
-    res.write(` ${JSON.stringify(finalData)}\n\n`);
+    res.write(`${JSON.stringify(finalData)}\n\n`);
     res.end();
-});
+}));
+
+// ============================================
+// ОБРАБОТЧИКИ ОШИБОК (ДОЛЖНЫ БЫТЬ ПОСЛЕДНИМИ)
+// ============================================
 
 // 404
-app.use((req, res) => {
-    res.status(404).render('error', { message: 'Страница не найдена' });
-});
+app.use(notFoundHandler);
+
+// Глобальный обработчик ошибок
+app.use(errorHandler);
+
+// ============================================
+// ЗАПУСК СЕРВЕРА
+// ============================================
 
 app.listen(port, () => {
     logAction('SERVER_START', `http://localhost:${port}`);
     console.log(`✅ Телетекст-плеер запущен: http://localhost:${port}`);
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+    logAction('SERVER_SHUTDOWN', 'Graceful shutdown...');
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    logAction('SERVER_SHUTDOWN', 'Graceful shutdown...');
+    process.exit(0);
 });
