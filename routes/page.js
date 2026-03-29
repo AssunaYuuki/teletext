@@ -64,7 +64,7 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
 
     const linkFixed = raw.replace(
         /href="(\d+)\.html"/g,
-        (_, p) => `href="/page/${encodeURIComponent(decodedPath)}/${p}"`
+        (_, p) => `href="/page/${encodeURIComponent(decodedPath)}/${p}" target="_top"`
     );
 
     const subpageRegex = /<div class="subpage" id="([^"]+)">([\s\S]*?)<\/div>/g;
