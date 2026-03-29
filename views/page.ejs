@@ -43,6 +43,51 @@
       display: flex;
       gap: 6px;
       margin-bottom: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .anim-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .anim-btn {
+      padding: 4px 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .anim-btn.playing {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .anim-speed {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--fg);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+    }
+
+    .anim-speed input[type=range] {
+      width: 100px;
+      accent-color: var(--accent);
+    }
+
+    .anim-counter {
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      min-width: 60px;
     }
 
     .sp-btn {
@@ -180,6 +225,15 @@
   <div class="page-container">
     <div class="content-wrapper">
       <% if (subpages.length > 1) { %>
+      <div class="anim-controls">
+        <button class="anim-btn" id="anim-play" title="Автопоказ подстраниц">▶ Авто</button>
+        <div class="anim-speed">
+          <span>Скорость:</span>
+          <input type="range" id="anim-speed-range" min="100" max="3000" step="100" value="500">
+          <span id="anim-speed-label">0.5 с</span>
+        </div>
+        <span class="anim-counter" id="anim-counter"></span>
+      </div>
       <div class="subpage-switcher">
         <% subpages.forEach((sp, i) => { %>
           <button class="sp-btn <%= i === 0 ? 'active' : '' %>" data-index="<%= i %>"><%= i + 1 %></button>
@@ -275,6 +329,66 @@
 
     showSubpage(0);
 
+    // --- Автоанимация подстраниц ---
+    if (subpages.length > 1) {
+      let animTimer = null;
+      let currentSubpageIndex = 0;
+      const playBtn = document.getElementById('anim-play');
+      const speedRange = document.getElementById('anim-speed-range');
+      const speedLabel = document.getElementById('anim-speed-label');
+      const counter = document.getElementById('anim-counter');
+
+      function updateCounter() {
+        counter.textContent = `${currentSubpageIndex + 1} / ${subpages.length}`;
+      }
+      updateCounter();
+
+      function animStep() {
+        currentSubpageIndex = (currentSubpageIndex + 1) % subpages.length;
+        showSubpage(currentSubpageIndex);
+        updateCounter();
+      }
+
+      function getInterval() {
+        return parseInt(speedRange.value, 10);
+      }
+
+      function startAnim() {
+        if (animTimer) clearInterval(animTimer);
+        animTimer = setInterval(animStep, getInterval());
+        playBtn.textContent = '⏸ Пауза';
+        playBtn.classList.add('playing');
+      }
+
+      function stopAnim() {
+        clearInterval(animTimer);
+        animTimer = null;
+        playBtn.textContent = '▶ Авто';
+        playBtn.classList.remove('playing');
+      }
+
+      playBtn.addEventListener('click', () => {
+        if (animTimer) stopAnim(); else startAnim();
+      });
+
+      speedRange.addEventListener('input', () => {
+        const ms = parseInt(speedRange.value, 10);
+        speedLabel.textContent = ms >= 1000 ? (ms / 1000).toFixed(1) + ' с' : ms + ' мс';
+        if (animTimer) {
+          clearInterval(animTimer);
+          animTimer = setInterval(animStep, ms);
+        }
+      });
+
+      // Клик по кнопке подстраницы останавливает авто и обновляет счётчик
+      document.querySelectorAll('.sp-btn').forEach((btn, i) => {
+        btn.addEventListener('click', () => {
+          stopAnim();
+          currentSubpageIndex = i;
+          updateCounter();
+        });
+      });
+    }
 
   </script>
 
