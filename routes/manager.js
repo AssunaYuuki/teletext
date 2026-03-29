@@ -7,11 +7,7 @@ const { uploadFiles } = require('../middleware/upload');
 
 const router = express.Router();
 
-router.get('/manager', (req, res) => {
-    res.redirect('/manager/');
-});
-
-router.get('/manager/*', asyncHandler(async (req, res) => {
+router.get(['/manager', '/manager/*'], asyncHandler(async (req, res) => {
     const decodedPath = req.params[0] || '';
 
     if (!isValidPath(decodedPath)) {
