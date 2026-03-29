@@ -44,7 +44,42 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
     const prevPage = currentIndex > 0 ? pageNumbers[currentIndex - 1] : null;
     const nextPage = currentIndex < pageNumbers.length - 1 ? pageNumbers[currentIndex + 1] : null;
 
-    const content = await fs.readFile(htmlFile, 'utf-8');
+    const raw = await fs.readFile(htmlFile, 'utf-8');
+
+    const headMatch = raw.match(/<head>([\s\S]*?)<\/head>/i);
+    const headContent = headMatch ? headMatch[1] : '';
+
+    const flFix = `<style>
+@keyframes teletext-blink{0%,49%{color:inherit}50%,100%{color:transparent}}
+.fl{text-decoration:none!important;animation:teletext-blink 1s step-end infinite}
+.cn{visibility:hidden}
+</style>`;
+
+    const encodedBasePath = decodedPath.split('/').map(s => encodeURIComponent(s)).join('/');
+    const assetBase = `/teletext/${encodedBasePath}/`;
+    // Заменяем относительные href/src в head на абсолютные — base href в srcdoc ненадёжен
+    const patchedHeadContent = headContent
+        .replace(/(href|src)="(?!https?:|\/|#)([^"]+)"/g, `$1="${assetBase}$2"`);
+    const patchedHead = `<head>${patchedHeadContent}${flFix}</head>`;
+
+    const linkFixed = raw.replace(
+        /href="(\d+)\.html"/g,
+        (_, p) => `href="/page/${encodeURIComponent(decodedPath)}/${p}"`
+    );
+
+    const subpageRegex = /<div class="subpage" id="([^"]+)">([\s\S]*?)<\/div>/g;
+    const subpages = [];
+    let spMatch;
+    while ((spMatch = subpageRegex.exec(linkFixed)) !== null) {
+        const [, id, inner] = spMatch;
+        const html = `<html>${patchedHead}<body><div class="subpage" id="${id}">${inner}</div></body></html>`;
+        subpages.push({ id, html });
+    }
+
+    if (subpages.length === 0) {
+        subpages.push({ id: '0000', html: raw });
+    }
+
     const pathParts = decodedPath.split('/').filter(Boolean);
     const breadcrumb = pathParts.map((part, i) => ({
         name: part,
@@ -56,8 +91,6 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
         const hasThumb = await fs.access(pngPath).then(() => true).catch(() => false);
         return { page: p, hasThumb };
     }));
-
-    const basePath = `/teletext/${decodedPath}/`;
 
     const logoSvgPath = path.join(fullPath, 'logo.svg');
     const logoPngPath = path.join(fullPath, 'logo.png');
@@ -71,14 +104,13 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
 
     res.render('page', {
         pageNumber: page,
-        content,
+        subpages,
         currentPath: decodedPath,
         folderName: path.basename(fullPath) || 'Архив',
         prevPage,
         nextPage,
         pageList,
         breadcrumb,
-        basePath,
         hasLogo: logoExists || logoExistsPng,
         logoUrl,
         disableCopy: true
