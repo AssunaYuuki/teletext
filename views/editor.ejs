@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>✏️ Редактор — <%= fileName %></title>
+  <link rel="stylesheet" href="/global.css">
+  <style>
+    .editor-container {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 120px);
+      gap: 12px;
+      padding: 0 20px;
+    }
+    .editor-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+    }
+    .file-info {
+      color: var(--accent);
+      font-size: 0.9rem;
+    }
+    .editor-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-editor {
+      padding: 6px 16px;
+      background: var(--card-bg);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .btn-editor:hover {
+      background: var(--accent);
+      color: var(--bg);
+    }
+    .btn-save {
+      background: var(--accent);
+      color: var(--bg);
+    }
+    .editor-wrap {
+      flex: 1;
+      display: flex;
+      gap: 12px;
+      min-height: 0;
+    }
+    .code-editor {
+      flex: 1;
+      background: #0a0f0c;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #00ff99;
+      resize: none;
+      outline: none;
+      tab-size: 2;
+    }
+    .code-editor:focus {
+      box-shadow: 0 0 10px rgba(0,255,153,0.3);
+    }
+    .preview-panel {
+      width: 50%;
+      background: #fff;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .preview-header {
+      padding: 8px;
+      background: rgba(0,255,153,0.1);
+      color: var(--accent);
+      font-size: 0.8rem;
+      border-bottom: 1px solid var(--accent);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #preview-frame {
+      width: 100%;
+      flex: 1;
+      border: none;
+      background: #fff;
+    }
+    .status-msg {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      background: var(--card-bg);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      color: var(--accent);
+      display: none;
+      animation: slideIn 0.3s ease;
+    }
+    .status-msg.show {
+      display: block;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(400px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <header class="nav-bar">
+    <div class="breadcrumb">
+      <a href="/">🏠</a>
+      <a href="/manager/<%= parentPath %>">📁 Менеджер</a>
+      <span> → ✏️ <%= fileName %></span>
+    </div>
+  </header>
+
+  <div class="editor-container">
+    <div class="editor-header">
+      <div class="file-info">📄 <%= fileName %></div>
+      <div class="editor-actions">
+        <button class="btn-editor" onclick="updatePreview()">🔄 Обновить</button>
+        <a href="/manager/<%= parentPath %>" class="btn-editor">← Назад</a>
+        <button class="btn-editor btn-save" onclick="saveFile()">💾 Сохранить</button>
+      </div>
+    </div>
+
+    <div class="editor-wrap">
+      <textarea id="code-editor" class="code-editor" spellcheck="false"><%- content %></textarea>
+      <div class="preview-panel">
+        <div class="preview-header">
+          <span>👁️ Предпросмотр</span>
+          <span style="font-size: 0.7em; opacity: 0.7;">CSS загрузится из папки</span>
+        </div>
+        <iframe id="preview-frame" sandbox="allow-same-origin allow-scripts"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <div id="status" class="status-msg">✅ Сохранено!</div>
+
+  <script>
+    const editor = document.getElementById('code-editor');
+    const preview = document.getElementById('preview-frame');
+    const status = document.getElementById('status');
+
+    // Путь к папке, где лежит файл (используем для поиска CSS)
+    const folderPath = '<%= parentPath %>';
+    // Базовый URL для assets (CSS, картинки)
+    const assetBaseUrl = `/teletext/${folderPath ? folderPath + '/' : ''}`;
+
+    // Функция исправления путей в HTML
+    function patchAssets(html) {
+      // 1. Исправляем CSS (<link href="style.css"> -> <link href="/teletext/.../style.css">)
+      html = html.replace(
+        /(<link\s+[^>]*href=["'])(?!https?:|\/)([^"']+)(["'][^>]*>)/gi,
+        `$1${assetBaseUrl}$2$3`
+      );
+
+      // 2. Исправляем картинки (<img src="image.png"> -> <img src="/teletext/.../image.png">)
+      html = html.replace(
+        /(<img\s+[^>]*src=["'])(?!https?:|\/|data:)([^"']+)(["'][^>]*>)/gi,
+        `$1${assetBaseUrl}$2$3`
+      );
+
+      return html;
+    }
+
+    // Автообновление превью
+    let debounceTimer;
+    editor.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(updatePreview, 500);
+    });
+
+    function updatePreview() {
+      const rawHtml = editor.value;
+      const fixedHtml = patchAssets(rawHtml);
+      preview.srcdoc = fixedHtml;
+    }
+
+    async function saveFile() {
+      try {
+        const res = await fetch('/manager/save-html/<%= filePath %>', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: editor.value })
+        });
+
+        if (res.ok) {
+          status.classList.add('show');
+          setTimeout(() => status.classList.remove('show'), 2000);
+          updatePreview();
+        } else {
+          const data = await res.json();
+          alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+        }
+      } catch (err) {
+        alert('Ошибка сети: ' + err.message);
+      }
+    }
+
+    // Поддержка Tab
+    editor.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+        editor.selectionStart = editor.selectionEnd = start + 2;
+      }
+    });
+
+    // Загрузка превью при старте
+    window.addEventListener('DOMContentLoaded', updatePreview);
+  </script>
+</body>
+</html>

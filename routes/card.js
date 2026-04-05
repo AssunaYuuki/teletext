@@ -7,9 +7,9 @@ const { upload } = require('../middleware/upload');
 
 const router = express.Router();
 
+// ✏️ GET: Открытие редактора карточки
 router.get('/edit-card/*', asyncHandler(async (req, res) => {
     const decodedPath = req.params[0] || '';
-
     if (!isValidPath(decodedPath)) {
         throw new AppError('Недопустимый путь', 400);
     }
@@ -20,19 +20,22 @@ router.get('/edit-card/*', asyncHandler(async (req, res) => {
         throw new AppError('Папка не найдена', 404);
     }
 
+    // Читаем текущее название
     let title = path.basename(decodedPath);
     const titleFile = path.join(fullPath, 'title.txt');
     try {
         const titleContent = await fs.readFile(titleFile, 'utf-8');
-        title = titleContent.trim();
+        if (titleContent.trim()) title = titleContent.trim();
     } catch (err) { /* файл не существует */ }
 
+    // Читаем текущее описание
     let description = '';
     const descFile = path.join(fullPath, 'description.txt');
     try {
-        description = await fs.readFile(descFile, 'utf-8').then(d => d.trim());
+        description = (await fs.readFile(descFile, 'utf-8')).trim();
     } catch (err) { /* файл не существует */ }
 
+    // Проверяем наличие логотипа
     const logoSvgPath = path.join(fullPath, 'logo.svg');
     const logoPngPath = path.join(fullPath, 'logo.png');
     const logoExists = await fs.access(logoSvgPath).then(() => true).catch(() => false);
@@ -54,9 +57,9 @@ router.get('/edit-card/*', asyncHandler(async (req, res) => {
     });
 }));
 
+// 💾 POST: Сохранение изменений
 router.post('/save-card/*', upload.single('logo'), asyncHandler(async (req, res) => {
     const decodedPath = req.params[0] || '';
-
     if (!isValidPath(decodedPath)) {
         throw new AppError('Недопустимый путь', 400);
     }
@@ -76,6 +79,7 @@ router.post('/save-card/*', upload.single('logo'), asyncHandler(async (req, res)
 
     let finalPathAfterRename = decodedPath;
 
+    // Переименование папки, если название изменилось
     if (newTitle !== path.basename(decodedPath)) {
         const parentDir = path.dirname(fullPath);
         const newFolderPath = path.join(parentDir, newTitle);
@@ -85,6 +89,7 @@ router.post('/save-card/*', upload.single('logo'), asyncHandler(async (req, res)
             throw new AppError(`Папка '${newTitle}' уже существует`, 400);
         }
 
+        // Безопасное переименование с обработкой блокировок Windows
         const maxRetries = 3;
         let success = false;
         for (let i = 0; i < maxRetries; i++) {
@@ -106,16 +111,15 @@ router.post('/save-card/*', upload.single('logo'), asyncHandler(async (req, res)
                 }
             }
         }
-
         if (!success) {
             throw new AppError(`Не удалось переименовать после ${maxRetries} попыток`, 500);
         }
-
         finalPathAfterRename = path.join(path.dirname(decodedPath), newTitle).replace(/^\/+/, '');
     }
 
     const finalFullDirPath = path.join(__dirname, '../teletext', finalPathAfterRename);
 
+    // Сохраняем title.txt
     try {
         await fs.writeFile(path.join(finalFullDirPath, 'title.txt'), newTitle, 'utf-8');
         logAction('TITLE_SAVED', `${newTitle} -> ${finalPathAfterRename}`);
@@ -123,6 +127,7 @@ router.post('/save-card/*', upload.single('logo'), asyncHandler(async (req, res)
         logAction('TITLE_SAVE_ERROR', `${finalPathAfterRename}: ${err.message}`);
     }
 
+    // Сохраняем или удаляем description.txt
     if (newDescription) {
         try {
             await fs.writeFile(path.join(finalFullDirPath, 'description.txt'), newDescription, 'utf-8');
@@ -143,6 +148,7 @@ router.post('/save-card/*', upload.single('logo'), asyncHandler(async (req, res)
         }
     }
 
+    // Сохраняем логотип, если загружен
     if (req.file) {
         const targetName = req.file.originalname.toLowerCase().endsWith('.svg') ? 'logo.svg' : 'logo.png';
         const targetPath = path.join(finalFullDirPath, targetName);
@@ -158,9 +164,9 @@ router.post('/save-card/*', upload.single('logo'), asyncHandler(async (req, res)
     res.redirect(`/folder/${finalPathAfterRename}`);
 }));
 
+// 🗑️ POST: Удаление логотипа
 router.post('/logo-delete/*', asyncHandler(async (req, res) => {
     const decodedPath = req.params[0] || '';
-
     if (!isValidPath(decodedPath)) {
         throw new AppError('Недопустимый путь', 400);
     }

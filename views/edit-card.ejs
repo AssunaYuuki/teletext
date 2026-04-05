@@ -1,668 +1,212 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>✏️ Редактор карточки — <%= folderName %></title>
-  <link rel="stylesheet" href="/global.css">
-  <style>
-    /* ── Layout ─────────────────────────────────────────────── */
-    body {
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-
-    .page-header {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 14px 24px;
-      border-bottom: 1px solid rgba(0,255,153,0.2);
-      background: rgba(0,30,15,0.4);
-      flex-shrink: 0;
-    }
-
-    .page-header .back-link {
-      color: var(--accent);
-      text-decoration: none;
-      font-size: 1.1rem;
-      opacity: 0.7;
-      transition: opacity 0.2s;
-      white-space: nowrap;
-    }
-    .page-header .back-link:hover { opacity: 1; }
-
-    .page-header .header-title {
-      font-size: 0.9rem;
-      color: var(--fg);
-      opacity: 0.55;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .page-header .header-title strong {
-      color: var(--accent);
-      opacity: 1;
-    }
-
-    .editor-wrap {
-      flex: 1;
-      display: flex;
-      align-items: stretch;
-      min-height: 0;
-      gap: 0;
-    }
-
-    /* ── Left: preview panel ─────────────────────────────── */
-    .preview-panel {
-      width: 280px;
-      flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 28px;
-      padding: 32px 24px;
-      border-right: 1px solid rgba(0,255,153,0.15);
-      background: rgba(0,20,10,0.4);
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* subtle scanline overlay */
-    .preview-panel::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: repeating-linear-gradient(
-        to bottom,
-        transparent 0px,
-        transparent 3px,
-        rgba(0,255,153,0.015) 3px,
-        rgba(0,255,153,0.015) 4px
-      );
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .preview-label {
-      font-size: 0.7rem;
-      letter-spacing: 0.2em;
-      color: var(--accent);
-      opacity: 0.5;
-      text-transform: uppercase;
-      position: relative;
-      z-index: 1;
-    }
-
-    /* The card as it appears on the main grid */
-    .card-mock {
-      position: relative;
-      z-index: 1;
-      width: 140px;
-      height: 140px;
-      background: var(--card-bg);
-      border: 1px solid var(--accent);
-      border-radius: 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 10px;
-      box-shadow: 0 0 20px rgba(0,255,153,0.15),
-                  inset 0 0 12px rgba(0,60,30,0.6);
-      transition: box-shadow 0.3s;
-      overflow: hidden;
-    }
-
-    .card-mock:hover {
-      box-shadow: 0 0 28px rgba(0,255,153,0.3),
-                  inset 0 0 12px rgba(0,60,30,0.6);
-    }
-
-    #preview-logo {
-      height: 42px;
-      max-width: 112px;
-      object-fit: contain;
-      display: block;
-    }
-
-    .preview-logo-placeholder {
-      height: 42px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #ffcc00;
-      font-size: 1.6rem;
-    }
-
-    #preview-title {
-      font-size: 0.82rem;
-      font-weight: bold;
-      color: var(--accent);
-      text-align: center;
-      word-break: break-word;
-      line-height: 1.25;
-      width: 100%;
-    }
-
-    .preview-meta {
-      position: relative;
-      z-index: 1;
-      font-size: 0.72rem;
-      color: var(--fg);
-      opacity: 0.35;
-      text-align: center;
-      line-height: 1.6;
-    }
-
-    /* ── Right: form panel ───────────────────────────────── */
-    .form-panel {
-      flex: 1;
-      padding: 32px 36px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 28px;
-    }
-
-    .form-panel h1 {
-      font-size: 1rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--accent);
-      text-shadow: 0 0 10px rgba(0,255,153,0.4);
-      margin: 0;
-      animation: none; /* override global pulse */
-    }
-
-    /* ── Field groups ─────────────────────────────────────── */
-    #edit-form {
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
-
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .field label {
-      font-size: 0.72rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--accent);
-      opacity: 0.7;
-    }
-
-    .field input[type="text"],
-    .field textarea {
-      background: rgba(0, 20, 10, 0.7);
-      border: 1px solid rgba(0,255,153,0.3);
-      border-radius: 4px;
-      color: var(--fg);
-      font-family: var(--font-mono);
-      font-size: 0.95rem;
-      padding: 10px 14px;
-      width: 100%;
-      box-sizing: border-box;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      outline: none;
-    }
-
-    .field input[type="text"]:focus,
-    .field textarea:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 2px rgba(0,255,153,0.1);
-    }
-
-    .field textarea {
-      min-height: 80px;
-      resize: vertical;
-      line-height: 1.5;
-    }
-
-    .field .hint {
-      font-size: 0.75rem;
-      opacity: 0.4;
-      line-height: 1.4;
-    }
-
-    /* ── Logo upload zone ─────────────────────────────────── */
-    .logo-zone {
-      border: 1px dashed rgba(0,255,153,0.35);
-      border-radius: 6px;
-      padding: 20px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-      position: relative;
-      background: rgba(0,20,10,0.3);
-    }
-
-    .logo-zone:hover,
-    .logo-zone.drag-over {
-      border-color: var(--accent);
-      background: rgba(0,255,153,0.04);
-    }
-
-    .logo-zone input[type="file"] {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-      width: 100%;
-      height: 100%;
-    }
-
-    .logo-zone-icon {
-      font-size: 1.5rem;
-      margin-bottom: 6px;
-      display: block;
-    }
-
-    .logo-zone-text {
-      font-size: 0.8rem;
-      color: var(--fg);
-      opacity: 0.5;
-      line-height: 1.5;
-    }
-
-    .logo-zone-text strong {
-      color: var(--accent);
-      opacity: 1;
-    }
-
-    /* current logo thumbnail inside zone */
-    .logo-current {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      background: rgba(0,20,10,0.5);
-      border: 1px solid rgba(0,255,153,0.2);
-      border-radius: 4px;
-      padding: 10px 14px;
-    }
-
-    .logo-current img {
-      height: 36px;
-      max-width: 80px;
-      object-fit: contain;
-      flex-shrink: 0;
-    }
-
-    .logo-current-info {
-      flex: 1;
-      font-size: 0.78rem;
-      opacity: 0.6;
-      line-height: 1.5;
-    }
-
-    /* ── Divider ──────────────────────────────────────────── */
-    .divider {
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(0,255,153,0.2), transparent);
-    }
-
-    /* ── Actions row ──────────────────────────────────────── */
-    .actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: var(--bg);
-      border: 1px solid var(--accent);
-      padding: 10px 24px;
-      font-family: var(--font-mono);
-      font-size: 0.9rem;
-      font-weight: bold;
-      line-height: 1.4;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: opacity 0.2s, box-shadow 0.2s;
-      letter-spacing: 0.05em;
-    }
-    .btn-primary:hover:not(:disabled) {
-      box-shadow: 0 0 14px rgba(0,255,153,0.5);
-      opacity: 0.9;
-    }
-    .btn-primary:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .btn-ghost {
-      background: transparent;
-      color: var(--fg);
-      border: 1px solid rgba(255,255,255,0.15);
-      padding: 10px 18px;
-      font-family: var(--font-mono);
-      font-size: 0.9rem;
-      font-weight: bold;
-      line-height: 1.4;
-      border-radius: 4px;
-      cursor: pointer;
-      text-decoration: none;
-      display: inline-block;
-      transition: border-color 0.2s, color 0.2s;
-    }
-    .btn-ghost:hover {
-      border-color: rgba(255,255,255,0.4);
-      color: #fff;
-    }
-
-    /* delete logo — subtle destructive link */
-    .delete-logo-link {
-      margin-left: auto;
-      font-size: 0.78rem;
-      color: #ff6666;
-      opacity: 0.5;
-      background: none;
-      border: none;
-      font-family: var(--font-mono);
-      cursor: pointer;
-      padding: 4px 0;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      transition: opacity 0.2s;
-    }
-    .delete-logo-link:hover { opacity: 1; }
-
-    /* ── Toast notification ───────────────────────────────── */
-    .notification {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      padding: 12px 20px;
-      background: rgba(0,255,153,0.12);
-      border: 1px solid var(--accent);
-      border-radius: 6px;
-      color: var(--accent);
-      font-family: var(--font-mono);
-      font-size: 0.9rem;
-      z-index: 1000;
-      display: none;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 12px rgba(0,255,153,0.2);
-      transform: translateY(20px);
-      opacity: 0;
-      transition: transform 0.25s ease, opacity 0.25s ease;
-    }
-    .notification.show {
-      display: block;
-      transform: translateY(0);
-      opacity: 1;
-    }
-    .notification.hide {
-      transform: translateY(20px);
-      opacity: 0;
-    }
-
-    /* ── Responsive ───────────────────────────────────────── */
-    @media (max-width: 680px) {
-      .editor-wrap { flex-direction: column; }
-      .preview-panel {
-        width: 100%;
-        flex-direction: row;
-        justify-content: flex-start;
-        padding: 20px;
-        border-right: none;
-        border-bottom: 1px solid rgba(0,255,153,0.15);
-        gap: 20px;
-      }
-      .preview-label { display: none; }
-      .preview-meta { display: none; }
-      .card-mock { width: 90px; height: 90px; flex-shrink: 0; }
-      #preview-logo { height: 28px; }
-      #preview-title { font-size: 0.7rem; }
-      .form-panel { padding: 20px; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>✏️ Редактор карточки — <%= folderName %></title>
+<link rel="stylesheet" href="/global.css">
+<style>
+body { padding: 0; display: flex; flex-direction: column; min-height: 100vh; }
+.page-header { display: flex; align-items: center; gap: 14px; padding: 14px 24px; border-bottom: 1px solid rgba(0,255,153,0.2); background: rgba(0,30,15,0.4); flex-shrink: 0; }
+.page-header .back-link { color: var(--accent); text-decoration: none; font-size: 1.1rem; opacity: 0.7; transition: opacity 0.2s; white-space: nowrap; }
+.page-header .back-link:hover { opacity: 1; }
+.page-header .header-title { font-size: 0.9rem; color: var(--fg); opacity: 0.55; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-header .header-title strong { color: var(--accent); opacity: 1; }
+.editor-wrap { flex: 1; display: flex; align-items: stretch; min-height: 0; gap: 0; }
+.preview-panel { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 32px 24px; border-right: 1px solid rgba(0,255,153,0.15); background: rgba(0,20,10,0.4); position: relative; overflow: hidden; }
+.preview-panel::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(to bottom, transparent 0px, transparent 3px, rgba(0,255,153,0.015) 3px, rgba(0,255,153,0.015) 4px); pointer-events: none; z-index: 0; }
+.preview-label { font-size: 0.7rem; letter-spacing: 0.2em; color: var(--accent); opacity: 0.5; text-transform: uppercase; position: relative; z-index: 1; }
+.card-mock { position: relative; z-index: 1; width: 140px; height: 140px; background: var(--card-bg); border: 1px solid var(--accent); border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 10px; box-shadow: 0 0 20px rgba(0,255,153,0.15), inset 0 0 12px rgba(0,60,30,0.6); transition: box-shadow 0.3s; overflow: hidden; }
+.card-mock:hover { box-shadow: 0 0 28px rgba(0,255,153,0.3), inset 0 0 12px rgba(0,60,30,0.6); }
+#preview-logo { height: 42px; max-width: 112px; object-fit: contain; display: block; }
+.preview-logo-placeholder { height: 42px; display: flex; align-items: center; justify-content: center; color: #ffcc00; font-size: 1.6rem; }
+#preview-title { font-size: 0.82rem; font-weight: bold; color: var(--accent); text-align: center; word-break: break-word; line-height: 1.25; width: 100%; }
+.preview-meta { position: relative; z-index: 1; font-size: 0.72rem; color: var(--fg); opacity: 0.35; text-align: center; line-height: 1.6; }
+.form-panel { flex: 1; padding: 32px 36px; overflow-y: auto; display: flex; flex-direction: column; gap: 28px; }
+.form-panel h1 { font-size: 1rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); text-shadow: 0 0 10px rgba(0,255,153,0.4); margin: 0; animation: none; }
+#edit-form { display: flex; flex-direction: column; gap: 24px; }
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field label { font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); opacity: 0.7; }
+.field input[type="text"], .field textarea { background: rgba(0, 20, 10, 0.7); border: 1px solid rgba(0,255,153,0.3); border-radius: 4px; color: var(--fg); font-family: var(--font-mono); font-size: 0.95rem; padding: 10px 14px; width: 100%; box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s; outline: none; }
+.field input[type="text"]:focus, .field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,255,153,0.1); }
+.field textarea { min-height: 80px; resize: vertical; line-height: 1.5; }
+.field .hint { font-size: 0.75rem; opacity: 0.4; line-height: 1.4; }
+.logo-zone { border: 1px dashed rgba(0,255,153,0.35); border-radius: 6px; padding: 20px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; position: relative; background: rgba(0,20,10,0.3); }
+.logo-zone:hover, .logo-zone.drag-over { border-color: var(--accent); background: rgba(0,255,153,0.04); }
+.logo-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.logo-zone-icon { font-size: 1.5rem; margin-bottom: 6px; display: block; }
+.logo-zone-text { font-size: 0.8rem; color: var(--fg); opacity: 0.5; line-height: 1.5; }
+.logo-zone-text strong { color: var(--accent); opacity: 1; }
+.logo-current { display: flex; align-items: center; gap: 14px; background: rgba(0,20,10,0.5); border: 1px solid rgba(0,255,153,0.2); border-radius: 4px; padding: 10px 14px; }
+.logo-current img { height: 36px; max-width: 80px; object-fit: contain; flex-shrink: 0; }
+.logo-current-info { flex: 1; font-size: 0.78rem; opacity: 0.6; line-height: 1.5; }
+.divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(0,255,153,0.2), transparent); }
+.actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.btn-primary { background: var(--accent); color: var(--bg); border: 1px solid var(--accent); padding: 10px 24px; font-family: var(--font-mono); font-size: 0.9rem; font-weight: bold; line-height: 1.4; border-radius: 4px; cursor: pointer; transition: opacity 0.2s, box-shadow 0.2s; letter-spacing: 0.05em; }
+.btn-primary:hover:not(:disabled) { box-shadow: 0 0 14px rgba(0,255,153,0.5); opacity: 0.9; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-ghost { background: transparent; color: var(--fg); border: 1px solid rgba(255,255,255,0.15); padding: 10px 18px; font-family: var(--font-mono); font-size: 0.9rem; font-weight: bold; line-height: 1.4; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; transition: border-color 0.2s, color 0.2s; }
+.btn-ghost:hover { border-color: rgba(255,255,255,0.4); color: #fff; }
+.delete-logo-link { margin-left: auto; font-size: 0.78rem; color: #ff6666; opacity: 0.5; background: none; border: none; font-family: var(--font-mono); cursor: pointer; padding: 4px 0; text-decoration: underline; text-underline-offset: 3px; transition: opacity 0.2s; }
+.delete-logo-link:hover { opacity: 1; }
+.notification { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; background: rgba(0,255,153,0.12); border: 1px solid var(--accent); border-radius: 6px; color: var(--accent); font-family: var(--font-mono); font-size: 0.9rem; z-index: 1000; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 12px rgba(0,255,153,0.2); transform: translateY(20px); opacity: 0; transition: transform 0.25s ease, opacity 0.25s ease; }
+.notification.show { display: block; transform: translateY(0); opacity: 1; }
+.notification.hide { transform: translateY(20px); opacity: 0; }
+@media (max-width: 680px) { .editor-wrap { flex-direction: column; } .preview-panel { width: 100%; flex-direction: row; justify-content: flex-start; padding: 20px; border-right: none; border-bottom: 1px solid rgba(0,255,153,0.15); gap: 20px; } .preview-label { display: none; } .preview-meta { display: none; } .card-mock { width: 90px; height: 90px; flex-shrink: 0; } #preview-logo { height: 28px; } #preview-title { font-size: 0.7rem; } .form-panel { padding: 20px; } }
+</style>
 </head>
 <body class="crt">
-
-  <div class="notification" id="notification">✓ Сохранено</div>
-
-  <!-- Top bar -->
-  <div class="page-header">
-    <a href="<%= archivePath.includes('/') ? '/folder/' + archivePath.substring(0, archivePath.lastIndexOf('/')) : '/' %>" class="back-link">← назад</a>
-    <span class="header-title">редактор / <strong><%= folderName %></strong></span>
+<div class="notification" id="notification">✓ Сохранено</div>
+<div class="page-header">
+  <a href="<%= archivePath.includes('/') ? '/folder/' + archivePath.substring(0, archivePath.lastIndexOf('/')) : '/' %>" class="back-link">← назад</a>
+  <span class="header-title">редактор / <strong><%= folderName %></strong></span>
+</div>
+<div class="editor-wrap">
+  <div class="preview-panel">
+    <span class="preview-label">Превью</span>
+    <div class="card-mock">
+      <% if (hasLogo) { %>
+        <img id="preview-logo" src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип">
+      <% } else { %>
+        <div id="preview-logo" class="preview-logo-placeholder">🌐</div>
+      <% } %>
+      <div id="preview-title"><%= currentTitle %></div>
+    </div>
+    <div class="preview-meta"><div>/<%= archivePath %></div></div>
   </div>
-
-  <div class="editor-wrap">
-
-    <!-- Left: live preview -->
-    <div class="preview-panel">
-      <span class="preview-label">Превью</span>
-
-      <div class="card-mock">
+  <div class="form-panel">
+    <h1>Редактор карточки</h1>
+    <form id="edit-form" method="POST" action="/save-card/<%= archivePath %>" enctype="multipart/form-data">
+      <div class="field">
+        <label for="title">Название канала</label>
+        <input type="text" id="title" name="title" value="<%= currentTitle %>" required maxlength="50" placeholder="Введите название">
+        <span class="hint">Сохраняется в title.txt. Имя папки изменится автоматически.</span>
+      </div>
+      <div class="field">
+        <label for="description">Описание <span style="opacity:0.4; font-size:0.9em;">(необязательно)</span></label>
+        <textarea id="description" name="description" placeholder="Появляется при наведении на карточку"><%= currentDescription %></textarea>
+        <span class="hint">Сохраняется в description.txt</span>
+      </div>
+      <div class="field">
+        <label>Логотип</label>
         <% if (hasLogo) { %>
-          <img id="preview-logo" src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип">
-        <% } else { %>
-          <div id="preview-logo" class="preview-logo-placeholder">🌐</div>
-        <% } %>
-        <div id="preview-title"><%= currentTitle %></div>
-      </div>
-
-      <div class="preview-meta">
-        <div>/<%= archivePath %></div>
-      </div>
-    </div>
-
-    <!-- Right: form -->
-    <div class="form-panel">
-      <h1>Редактор карточки</h1>
-
-      <form id="edit-form" method="POST" action="/save-card/<%= archivePath %>" enctype="multipart/form-data">
-
-        <!-- Title -->
-        <div class="field">
-          <label for="title">Название канала</label>
-          <input type="text" id="title" name="title"
-                 value="<%= currentTitle %>" required maxlength="50"
-                 placeholder="Введите название">
-          <span class="hint">Сохраняется в title.txt. Имя папки изменится автоматически.</span>
-        </div>
-
-        <!-- Description -->
-        <div class="field">
-          <label for="description">Описание <span style="opacity:0.4; font-size:0.9em;">(необязательно)</span></label>
-          <textarea id="description" name="description"
-                    placeholder="Появляется при наведении на карточку"><%= currentDescription %></textarea>
-          <span class="hint">Сохраняется в description.txt</span>
-        </div>
-
-        <!-- Logo -->
-        <div class="field">
-          <label>Логотип</label>
-
-          <% if (hasLogo) { %>
-            <div class="logo-current">
-              <img id="current-logo" src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип">
-              <div class="logo-current-info">
-                Текущий логотип<br>
-                SVG / PNG / JPG
-              </div>
-            </div>
-          <% } %>
-
-          <div class="logo-zone" id="logo-zone">
-            <input type="file" name="logo" accept=".svg,.png,.jpg,.jpeg" id="logo-upload">
-            <span class="logo-zone-icon">⊕</span>
-            <div class="logo-zone-text">
-              <strong>Выбрать файл</strong> или перетащить<br>
-              SVG, PNG, JPG — оставьте пустым, чтобы не менять
-            </div>
+          <div class="logo-current">
+            <img id="current-logo" src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип">
+            <div class="logo-current-info">Текущий логотип<br>SVG / PNG / JPG</div>
           </div>
+        <% } %>
+        <div class="logo-zone" id="logo-zone">
+          <input type="file" name="logo" accept=".svg,.png,.jpg,.jpeg" id="logo-upload">
+          <span class="logo-zone-icon">⊕</span>
+          <div class="logo-zone-text"><strong>Выбрать файл</strong> или перетащить<br>SVG, PNG, JPG — оставьте пустым, чтобы не менять</div>
         </div>
-
-        <div class="divider" style="margin-top: 12px;"></div>
-
-        <!-- Actions -->
-        <div class="actions">
-          <button type="submit" class="btn-primary" id="save-btn">Сохранить</button>
-          <a href="<%= archivePath.includes('/') ? '/folder/' + archivePath.substring(0, archivePath.lastIndexOf('/')) : '/' %>" class="btn-ghost">Отмена</a>
-
-          <% if (hasLogo) { %>
-            <form method="POST" action="/logo-delete/<%= archivePath %>"
-                  style="margin-left:auto; display:inline;"
-                  onsubmit="return confirm('Удалить логотип? Это нельзя отменить.')">
-              <button type="submit" class="delete-logo-link">удалить логотип</button>
-            </form>
-          <% } %>
-        </div>
-
-      </form>
-    </div>
+      </div>
+      <div class="divider" style="margin-top: 12px;"></div>
+      <div class="actions">
+        <button type="submit" class="btn-primary" id="save-btn">Сохранить</button>
+        <a href="<%= archivePath.includes('/') ? '/folder/' + archivePath.substring(0, archivePath.lastIndexOf('/')) : '/' %>" class="btn-ghost">Отмена</a>
+        <% if (hasLogo) { %>
+          <form method="POST" action="/logo-delete/<%= archivePath %>" style="margin-left:auto; display:inline;" onsubmit="return confirm('Удалить логотип? Это нельзя отменить.')">
+            <button type="submit" class="delete-logo-link">удалить логотип</button>
+          </form>
+        <% } %>
+      </div>
+    </form>
   </div>
+</div>
 
-  <script>
-    // ── Form submit ──────────────────────────────────────────
-    document.getElementById('edit-form').addEventListener('submit', async function(e) {
-      e.preventDefault();
+<script>
+// Форма сохранения
+document.getElementById('edit-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const formData = new FormData(this);
+  const submitBtn = document.getElementById('save-btn');
+  const originalText = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Сохранение...';
+  try {
+    const res = await fetch(this.action, { method: 'POST', body: formData });
+    if (res.ok) {
+      const notification = document.getElementById('notification');
+      notification.classList.add('show');
+      setTimeout(() => {
+        notification.classList.add('hide');
+        setTimeout(() => { notification.classList.remove('show', 'hide'); }, 300);
+      }, 2000);
 
-      const formData = new FormData(this);
-      const submitBtn = document.getElementById('save-btn');
-      const originalText = submitBtn.textContent;
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Сохранение...';
-
-      try {
-        const res = await fetch(this.action, {
-          method: 'POST',
-          body: formData
-        });
-
-        if (res.ok) {
-          // ✅ Показать уведомление
-          const notification = document.getElementById('notification');
-          notification.classList.add('show');
-          setTimeout(() => {
-            notification.classList.add('hide');
-            setTimeout(() => {
-              notification.classList.remove('show');
-              notification.classList.remove('hide');
-            }, 300);
-          }, 2000);
-
-          // ✅ Обновить превью карточки
-          const newTitle = formData.get('title');
-          document.getElementById('preview-title').textContent = newTitle;
-
-          const newLogoFile = formData.get('logo');
-          if (newLogoFile && newLogoFile.size > 0) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-              const previewLogo = document.getElementById('preview-logo');
-              if (previewLogo.tagName === 'IMG') {
-                previewLogo.src = e.target.result;
-              } else {
-                // replace placeholder div with img
-                const img = document.createElement('img');
-                img.id = 'preview-logo';
-                img.src = e.target.result;
-                img.alt = 'Логотип';
-                previewLogo.replaceWith(img);
-              }
-              const currentLogo = document.getElementById('current-logo');
-              if (currentLogo) currentLogo.src = e.target.result;
-            };
-            reader.readAsDataURL(newLogoFile);
-          }
-
-          // ✅ Обновить логотип в хедере (если он есть)
-          const headerLogo = document.querySelector('#header-logo');
-          if (newLogoFile && newLogoFile.size > 0 && headerLogo) {
-            const headerReader = new FileReader();
-            headerReader.onload = function(e) {
-              headerLogo.src = e.target.result;
-            };
-            headerReader.readAsDataURL(newLogoFile);
-          }
-
-          // ✅ Обновить название в хедере
-          const headerTitleElement = document.querySelector('header h2');
-          if (headerTitleElement) {
-            const logoImg = headerTitleElement.querySelector('img');
-            headerTitleElement.innerHTML = '';
-            if (logoImg) {
-              headerTitleElement.appendChild(logoImg);
-              headerTitleElement.appendChild(document.createTextNode(' '));
-            }
-            headerTitleElement.appendChild(document.createTextNode(newTitle));
-          }
-
-          // ✅ Проверяем, изменилось ли имя папки
-          const currentFolderName = '<%= folderName %>';
-          if (newTitle && newTitle !== currentFolderName) {
-            const currentPath = '<%= archivePath %>';
-            const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
-            const newPath = parentPath ? `${parentPath}/${encodeURIComponent(newTitle)}` : encodeURIComponent(newTitle);
-            setTimeout(() => {
-              window.location.href = `/folder/${newPath}`;
-            }, 2000);
-          } else {
-            setTimeout(() => {
-              window.location.reload();
-            }, 2000);
-          }
-        } else {
-          const errorText = await res.text();
-          alert('Ошибка: ' + errorText);
-        }
-      } catch (err) {
-        alert('Ошибка сети');
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalText;
-      }
-    });
-
-    // ── Logo file preview ────────────────────────────────────
-    document.getElementById('logo-upload').addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (file) {
-        // update zone label
-        const zoneText = document.querySelector('.logo-zone-text');
-        if (zoneText) zoneText.innerHTML = `<strong>${file.name}</strong>`;
-
+      const newTitle = formData.get('title');
+      document.getElementById('preview-title').textContent = newTitle;
+      const newLogoFile = formData.get('logo');
+      if (newLogoFile && newLogoFile.size > 0) {
         const reader = new FileReader();
         reader.onload = function(e) {
           const previewLogo = document.getElementById('preview-logo');
-          if (previewLogo.tagName === 'IMG') {
-            previewLogo.src = e.target.result;
-          } else {
-            const img = document.createElement('img');
-            img.id = 'preview-logo';
-            img.src = e.target.result;
-            img.alt = 'Логотип';
-            previewLogo.replaceWith(img);
-          }
+          if (previewLogo.tagName === 'IMG') previewLogo.src = e.target.result;
+          else { const img = document.createElement('img'); img.id = 'preview-logo'; img.src = e.target.result; img.alt = 'Логотип'; previewLogo.replaceWith(img); }
+          const currentLogo = document.getElementById('current-logo');
+          if (currentLogo) currentLogo.src = e.target.result;
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(newLogoFile);
       }
-    });
 
-    // ── Logo zone drag highlight ──────────────────────────────
-    const zone = document.getElementById('logo-zone');
-    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
-    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-    zone.addEventListener('drop', () => zone.classList.remove('drag-over'));
+      const headerLogo = document.querySelector('#header-logo');
+      if (newLogoFile && newLogoFile.size > 0 && headerLogo) {
+        const hr = new FileReader();
+        hr.onload = e => headerLogo.src = e.target.result;
+        hr.readAsDataURL(newLogoFile);
+      }
+      const headerTitle = document.querySelector('header h2');
+      if (headerTitle) {
+        const lg = headerTitle.querySelector('img');
+        headerTitle.innerHTML = '';
+        if (lg) { headerTitle.appendChild(lg); headerTitle.appendChild(document.createTextNode(' ')); }
+        headerTitle.appendChild(document.createTextNode(newTitle));
+      }
 
-    // ── Real-time title preview ───────────────────────────────
-    document.getElementById('title').addEventListener('input', function() {
-      document.getElementById('preview-title').textContent = this.value || '…';
-    });
-  </script>
+      const curFolder = '<%= folderName %>';
+      if (newTitle && newTitle !== curFolder) {
+        const cp = '<%= archivePath %>';
+        const pp = cp.substring(0, cp.lastIndexOf('/'));
+        const np = pp ? `${pp}/${encodeURIComponent(newTitle)}` : encodeURIComponent(newTitle);
+        setTimeout(() => window.location.href = `/folder/${np}`, 2000);
+      } else {
+        setTimeout(() => window.location.reload(), 2000);
+      }
+    } else {
+      alert('Ошибка: ' + await res.text());
+    }
+  } catch (err) {
+    alert('Ошибка сети');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalText;
+  }
+});
 
+// Предпросмотр логотипа
+document.getElementById('logo-upload').addEventListener('change', function(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const zt = document.querySelector('.logo-zone-text');
+  if (zt) zt.innerHTML = `<strong>${file.name}</strong>`;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const pl = document.getElementById('preview-logo');
+    if (pl.tagName === 'IMG') pl.src = e.target.result;
+    else { const img = document.createElement('img'); img.id='preview-logo'; img.src=e.target.result; img.alt='Логотип'; pl.replaceWith(img); }
+  };
+  reader.readAsDataURL(file);
+});
+
+// Drag & Drop зона
+const zone = document.getElementById('logo-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', () => zone.classList.remove('drag-over'));
+
+// Живое обновление заголовка в превью
+document.getElementById('title').addEventListener('input', function() {
+  document.getElementById('preview-title').textContent = this.value || '…';
+});
+</script>
 </body>
 </html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>✏️ Редактор HTML — <%= fileName %></title>
+  <link rel="stylesheet" href="/global.css">
+  <style>
+    .editor-wrap { display:flex; height:calc(100vh - 160px); gap:0; border:1px solid var(--accent); border-radius:6px; overflow:hidden; background:#080c0a; }
+    .code-pane { flex:1; display:flex; flex-direction:column; border-right:1px solid rgba(0,255,153,0.2); }
+    .pane-header { padding:8px 12px; background:rgba(0,255,153,0.05); border-bottom:1px solid rgba(0,255,153,0.2); font-size:0.8rem; color:var(--accent); display:flex; justify-content:space-between; align-items:center; }
+    #html-editor { flex:1; width:100%; background:#0a0f0c; color:#00ff99; border:none; padding:12px; font-family:'Courier New',monospace; font-size:13px; line-height:1.5; resize:none; outline:none; tab-size:2; }
+    .preview-pane { flex:1; background:#fff; display:flex; flex-direction:column; }
+    .preview-header { padding:8px 12px; background:rgba(0,0,0,0.85); border-bottom:1px solid #333; color:#aaa; font-size:0.8rem; }
+    #html-preview { flex:1; border:none; background:#fff; width:100%; }
+    .actions-bar { padding:12px; display:flex; gap:10px; justify-content:flex-end; background:var(--card-bg); border:1px solid var(--accent); border-radius:6px; margin-top:12px; }
+    .btn-save { background:var(--accent); color:var(--bg); border:1px solid var(--accent); padding:8px 16px; font-family:var(--font-mono); font-weight:bold; cursor:pointer; border-radius:4px; transition:0.2s; }
+    .btn-save:hover:not(:disabled) { box-shadow:0 0 10px rgba(0,255,153,0.4); }
+    .btn-save:disabled { opacity:0.5; cursor:not-allowed; }
+    .btn-ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); padding:8px 16px; font-family:var(--font-mono); cursor:pointer; border-radius:4px; text-decoration:none; transition:0.2s; }
+    .btn-ghost:hover { background:rgba(0,255,153,0.1); }
+    .status-msg { font-size:0.8rem; color:#00ff99; opacity:0; transition:opacity 0.3s; align-self:center; }
+    .status-msg.show { opacity:1; }
+    @media (max-width: 768px) { .editor-wrap { flex-direction:column; height:auto; } .code-pane, .preview-pane { height:350px; } .code-pane { border-right:none; border-bottom:1px solid rgba(0,255,153,0.2); } }
+  </style>
+</head>
+<body class="crt">
+  <header class="nav-bar">
+    <div class="breadcrumb"><a href="/">🏠</a> <a href="<%= returnTo %>">← Менеджер</a> <span> → Редактор: <%= fileName %></span></div>
+  </header>
+
+  <div style="max-width:1200px; margin:0 auto; padding:12px;">
+    <div class="editor-wrap">
+      <div class="code-pane">
+        <div class="pane-header"><span>📄 Исходный код</span></div>
+        <textarea id="html-editor" spellcheck="false"></textarea>
+      </div>
+      <div class="preview-pane">
+        <div class="preview-header">👁️ Предпросмотр</div>
+        <iframe id="html-preview" sandbox="allow-same-origin allow-scripts"></iframe>
+      </div>
+    </div>
+
+    <div class="actions-bar">
+      <span class="status-msg" id="status">✅ Сохранено!</span>
+      <button onclick="updatePreview()" class="btn-ghost" style="border-color:rgba(255,255,255,0.3);color:#aaa;">🔄 Обновить превью</button>
+      <a href="<%= returnTo %>" class="btn-ghost">← Назад</a>
+      <button onclick="saveHtml()" class="btn-save" id="save-btn">💾 Сохранить</button>
+    </div>
+  </div>
+
+  <script>
+    // Безопасная передача контента в JS
+    const rawContent = `<%- JSON.stringify(content).slice(1, -1) %>`;
+    const editor = document.getElementById('html-editor');
+    const preview = document.getElementById('html-preview');
+    const status = document.getElementById('status');
+    const saveBtn = document.getElementById('save-btn');
+
+    editor.value = rawContent;
+
+    function updatePreview() {
+      preview.srcdoc = editor.value;
+    }
+
+    // Автообновление с задержкой
+    let debounceTimer;
+    editor.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(updatePreview, 400);
+    });
+
+    window.addEventListener('DOMContentLoaded', updatePreview);
+
+    async function saveHtml() {
+      saveBtn.disabled = true; saveBtn.textContent = 'Сохранение...';
+      try {
+        const res = await fetch(window.location.pathname, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ html: editor.value, returnTo: '<%= returnTo %>' })
+        });
+        if (res.ok) {
+          status.classList.add('show');
+          setTimeout(() => status.classList.remove('show'), 2000);
+          updatePreview();
+        } else {
+          alert('Ошибка: ' + await res.text());
+        }
+      } catch(e) { alert('Ошибка сети'); }
+      finally { saveBtn.disabled = false; saveBtn.textContent = '💾 Сохранить'; }
+    }
+
+    // Поддержка Tab в textarea
+    editor.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+        editor.selectionStart = editor.selectionEnd = start + 2;
+      }
+    });
+  </script>
+</body>
+</html>

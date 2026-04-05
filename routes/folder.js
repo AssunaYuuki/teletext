@@ -17,12 +17,12 @@ router.get('/folder/*', asyncHandler(async (req, res) => {
     }
 
     const fullPath = path.join(__dirname, '../teletext', decodedPath);
-
     const stats = await fs.stat(fullPath).catch(() => null);
     if (!stats || !stats.isDirectory()) {
         throw new AppError('Папка не найдена', 404);
     }
 
+    // Генерация превьюшек в фоне
     generateThumbnailsForFolder(fullPath).catch(err =>
         logAction('THUMBNAIL_GEN_ERROR', err.message)
     );
@@ -34,7 +34,6 @@ router.get('/folder/*', asyncHandler(async (req, res) => {
     await Promise.all(items.map(async item => {
         const itemPath = path.join(fullPath, item);
         const itemStats = await fs.stat(itemPath);
-
         if (itemStats.isDirectory()) {
             folders.push(item);
         } else if (item.endsWith('.html')) {
@@ -42,12 +41,13 @@ router.get('/folder/*', asyncHandler(async (req, res) => {
         }
     }));
 
+    // Группировка страниц по годам
     const pagesByYear = {};
-
     for (const file of htmlFiles) {
         const pageStr = file.replace('.html', '');
+        // ✅ Увеличен лимит до 9999
         const page = parseInt(pageStr, 10);
-        if (isNaN(page) || page < 100 || page > 999) continue;
+        if (isNaN(page) || page < 100 || page > 9999) continue;
 
         let year = 0;
         const yearMatch = file.match(/_(\d{2}|\d{4})\.html$/);
@@ -77,14 +77,16 @@ router.get('/folder/*', asyncHandler(async (req, res) => {
         groupedPages[year] = pagesByYear[year].sort((a, b) => a.page - b.page);
     });
 
+    // Плоский список страниц (для совместимости со старыми шаблонами)
     const pages = htmlFiles.map(file => {
         const pageStr = file.replace('.html', '');
         const page = parseInt(pageStr, 10);
         const pngPath = path.join(fullPath, `${pageStr}.png`);
         const hasThumb = fsSync.existsSync(pngPath);
         return { page, hasThumb };
-    }).filter(p => !isNaN(p.page) && p.page >= 100 && p.page <= 999);
+    }).filter(p => !isNaN(p.page) && p.page >= 100 && p.page <= 9999);
 
+    // Группировка папок по годам
     const foldersByYear = {};
     folders.forEach(folder => {
         let year = 0;
@@ -117,6 +119,7 @@ router.get('/folder/*', asyncHandler(async (req, res) => {
         path: pathParts.slice(0, i + 1).join('/')
     }));
 
+    // Логотип папки
     const logoSvgPath = path.join(fullPath, 'logo.svg');
     const logoPngPath = path.join(fullPath, 'logo.png');
     const logoExists = await fs.access(logoSvgPath).then(() => true).catch(() => false);
@@ -127,12 +130,12 @@ router.get('/folder/*', asyncHandler(async (req, res) => {
             ? `/teletext/${decodedPath}/logo.png`
             : null;
 
+    // Карточки папок (логотипы, названия)
     const folderCards = {};
     await Promise.all(folders.map(async folder => {
         const folderPath = path.join(fullPath, folder);
         const hasSvg = await fs.access(path.join(folderPath, 'logo.svg')).then(() => true).catch(() => false);
         const hasPng = await fs.access(path.join(folderPath, 'logo.png')).then(() => true).catch(() => false);
-
         let displayName = folder;
         const titleFile = path.join(folderPath, 'title.txt');
         try {

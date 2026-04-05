@@ -6,6 +6,49 @@ const { isValidPath } = require('../lib/utils');
 
 const router = express.Router();
 
+/**
+ * Автоматическое определение Fastext-ссылок.
+ * 1. Ищет мета-комментарий <!-- FASTEXT: R=... G=... Y=... B=... -->
+ * 2. Если нет — сканирует HTML на наличие ссылок вида href="101.html" и назначает их цветам.
+ */
+function extractFastextLinks(html) {
+    // 1. Попытка найти ручной комментарий
+    const commentMatch = html.match(/<!--\s*FASTEXT:\s*R=(\d+)\s+G=(\d+)\s+Y=(\d+)\s+B=(\d+)\s*-->/i);
+    if (commentMatch) {
+        return {
+            red: commentMatch[1],
+            green: commentMatch[2],
+            yellow: commentMatch[3],
+            blue: commentMatch[4]
+        };
+    }
+
+    // 2. Автоматическое сканирование ссылок
+    // Ищем href="ЦИФРЫ.html" (поддерживает как кавычки, так и апострофы)
+    const linkRegex = /href\s*=\s*['"](\d{3,4})\.html['"]/gi;
+    let match;
+    const foundPages = [];
+
+    while ((match = linkRegex.exec(html)) !== null) {
+        const pageNum = parseInt(match[1], 10);
+        // Фильтруем только валидные страницы телетекста
+        if (pageNum >= 100 && pageNum <= 9999) {
+            if (!foundPages.includes(pageNum)) {
+                foundPages.push(pageNum);
+            }
+        }
+        // Берем только первые 4 уникальных ссылки
+        if (foundPages.length >= 4) break;
+    }
+
+    return {
+        red: foundPages[0] || null,
+        green: foundPages[1] || null,
+        yellow: foundPages[2] || null,
+        blue: foundPages[3] || null
+    };
+}
+
 router.get('/page/*/:page', asyncHandler(async (req, res) => {
     const requestedPath = req.params[0] || '';
     const pageParam = req.params.page;
@@ -15,9 +58,10 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
         throw new AppError('Недопустимый путь', 400);
     }
 
+    // ✅ Увеличен лимит до 9999 (для файлов типа 2024.html)
     const page = parseInt(pageParam, 10);
-    if (isNaN(page) || page < 100 || page > 999) {
-        throw new AppError('Некорректный номер страницы (100–999)', 400);
+    if (isNaN(page) || page < 100 || page > 9999) {
+        throw new AppError('Некорректный номер страницы (100–9999)', 400);
     }
 
     const fullPath = path.join(__dirname, '../teletext', decodedPath);
@@ -33,22 +77,13 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
         throw new AppError(`Страница ${page} не найдена`, 404);
     }
 
-    const files = await fs.readdir(fullPath);
-    const pageNumbers = files
-        .filter(f => f.endsWith('.html'))
-        .map(f => parseInt(f.replace('.html', ''), 10))
-        .filter(n => !isNaN(n) && n >= 100 && n <= 999)
-        .sort((a, b) => a - b);
-
-    const currentIndex = pageNumbers.indexOf(page);
-    const prevPage = currentIndex > 0 ? pageNumbers[currentIndex - 1] : null;
-    const nextPage = currentIndex < pageNumbers.length - 1 ? pageNumbers[currentIndex + 1] : null;
-
     const raw = await fs.readFile(htmlFile, 'utf-8');
+
+    // ✅ Извлекаем Fastext-ссылки (автоматически или вручную)
+    const fastextLinks = extractFastextLinks(raw);
 
     const headMatch = raw.match(/<head>([\s\S]*?)<\/head>/i);
     const headContent = headMatch ? headMatch[1] : '';
-
     const flFix = `<style>
 @keyframes teletext-blink{0%,49%{color:inherit}50%,100%{color:transparent}}
 .fl{text-decoration:none!important;animation:teletext-blink 1s step-end infinite}
@@ -57,6 +92,7 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
 
     const encodedBasePath = decodedPath.split('/').map(s => encodeURIComponent(s)).join('/');
     const assetBase = `/teletext/${encodedBasePath}/`;
+
     // Заменяем относительные href/src в head на абсолютные — base href в srcdoc ненадёжен
     const patchedHeadContent = headContent
         .replace(/(href|src)="(?!https?:|\/|#)([^"]+)"/g, `$1="${assetBase}$2"`);
@@ -75,7 +111,6 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
         const html = `<html>${patchedHead}<body><div class="subpage" id="${id}">${inner}</div></body></html>`;
         subpages.push({ id, html });
     }
-
     if (subpages.length === 0) {
         subpages.push({ id: '0000', html: raw });
     }
@@ -85,6 +120,17 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
         name: part,
         path: pathParts.slice(0, i + 1).join('/')
     }));
+
+    const files = await fs.readdir(fullPath);
+    const pageNumbers = files
+        .filter(f => f.endsWith('.html'))
+        .map(f => parseInt(f.replace('.html', ''), 10))
+        .filter(n => !isNaN(n) && n >= 100 && n <= 9999)
+        .sort((a, b) => a - b);
+
+    const currentIndex = pageNumbers.indexOf(page);
+    const prevPage = currentIndex > 0 ? pageNumbers[currentIndex - 1] : null;
+    const nextPage = currentIndex < pageNumbers.length - 1 ? pageNumbers[currentIndex + 1] : null;
 
     const pageList = await Promise.all(pageNumbers.map(async p => {
         const pngPath = path.join(fullPath, `${p}.png`);
@@ -113,8 +159,8 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
         breadcrumb,
         hasLogo: logoExists || logoExistsPng,
         logoUrl,
-        disableCopy: true
+        fastextLinks: fastextLinks // ✅ Передаем данные о кнопках
     });
 }));
 
-module.exports = router;
+module.exports = router
