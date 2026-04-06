@@ -426,34 +426,46 @@
               <% if (year !== '0') { %>
                 <h4 class="year-header"><%= year %></h4>
                 <%
-                  // 🔹 Сортировка папок внутри группы с годом по дате из конца displayName (формат ДД.ММ.ГГ)
+                  // 🔍 ИСПРАВЛЕННАЯ СОРТИРОВКА
+                  // Допускаем 1 или 2 цифры для дня/месяца: (\d{1,2})
                   foldersInYear.sort((a, b) => {
                     const cardA = folderCards[a] || {};
                     const cardB = folderCards[b] || {};
                     const nameA = cardA.displayName || a;
                     const nameB = cardB.displayName || b;
 
-                    // Извлекаем дату из конца строки: ДД.ММ.ГГ
-                    const matchA = nameA.match(/(\d{2})\.(\d{2})\.(\d{2})$/);
-                    const matchB = nameB.match(/(\d{2})\.(\d{2})\.(\d{2})$/);
+                    // Ищем дату в конце строки (ДД.ММ.ГГ или ДД.ММ.ГГГГ, день/месяц могут быть без ведущего 0)
+                    const matchA = nameA.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+                    const matchB = nameB.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
 
-                    // Если даты нет — отправляем в конец
+                    // Если даты нет ни у одного — порядок не меняем (0)
                     if (!matchA && !matchB) return 0;
+                    // Если нет у A, а у B есть — A идет в конец (1)
                     if (!matchA) return 1;
+                    // Если нет у B, а у A есть — B идет в конец (-1, значит A раньше)
                     if (!matchB) return -1;
 
-                    const [, dA, mA, yA2] = matchA;
-                    const [, dB, mB, yB2] = matchB;
+                    // Извлекаем части
+                    let dA = matchA[1], mA = matchA[2], yA = matchA[3];
+                    let dB = matchB[1], mB = matchB[2], yB = matchB[3];
 
-                    // 🔹 Окно века: 30-99 → 19##, 00-29 → 20##
-                    const yA = parseInt(yA2, 10);
-                    const yB = parseInt(yB2, 10);
-                    const fullYearA = yA >= 30 ? `19${yA2}` : `20${yA2}`;
-                    const fullYearB = yB >= 30 ? `19${yB2}` : `20${yB2}`;
+                    // Нормализация: добавляем ведущий ноль, если цифра одна (4 -> 04)
+                    dA = dA.padStart(2, '0'); mA = mA.padStart(2, '0');
+                    dB = dB.padStart(2, '0'); mB = mB.padStart(2, '0');
 
-                    // Преобразуем в сравнимый формат YYYYMMDD
-                    const dateA = `${fullYearA}${mA}${dA}`;
-                    const dateB = `${fullYearB}${mB}${dB}`;
+                    // Окно века для 2-значных лет: 30-99 → 19xx, 00-29 → 20xx
+                    if (yA.length === 2) {
+                      const num = parseInt(yA, 10);
+                      yA = num >= 30 ? `19${yA}` : `20${yA}`;
+                    }
+                    if (yB.length === 2) {
+                      const num = parseInt(yB, 10);
+                      yB = num >= 30 ? `19${yB}` : `20${yB}`;
+                    }
+
+                    // Формируем строки YYYYMMDD для сравнения
+                    const dateA = `${yA}${mA}${dA}`;
+                    const dateB = `${yB}${mB}${dB}`;
 
                     return dateA.localeCompare(dateB); // по возрастанию
                   });
@@ -475,7 +487,8 @@
                          data-path="<%= currentPath ? currentPath + '/' + folder : folder %>"
                          onclick="updateHeaderLogo(this); window.location.href='/folder/<%= encodeURIComponent(currentPath ? currentPath + '/' + folder : folder) %>';"
                          onmouseenter="showEditButton(this)"
-                         onmouseleave="hideEditButton(this)">
+                         onmouseleave="hideEditButton(this)"
+                         >
 
                       <% if (logoUrl) { %>
                         <img src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип" style="height:32px; max-width: 100%; object-fit: contain; margin-top:8px;">
@@ -602,8 +615,6 @@
         }, 100);
       }
     }
-
-
 
     function showEditButton(card) {
       const btn = document.createElement('a');
