@@ -85,9 +85,10 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
     const headMatch = raw.match(/<head>([\s\S]*?)<\/head>/i);
     const headContent = headMatch ? headMatch[1] : '';
     const flFix = `<style>
-@keyframes teletext-blink{0%,49%{color:inherit}50%,100%{color:transparent}}
+@keyframes teletext-blink{50%,100%{color:transparent}}
 .fl{text-decoration:none!important;animation:teletext-blink 1s step-end infinite}
 .cn{visibility:hidden}
+body{display:flex;justify-content:center;}
 </style>`;
 
     const encodedBasePath = decodedPath.split('/').map(s => encodeURIComponent(s)).join('/');
