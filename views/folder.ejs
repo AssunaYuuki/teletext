@@ -425,6 +425,39 @@
             <div class="year-section">
               <% if (year !== '0') { %>
                 <h4 class="year-header"><%= year %></h4>
+                <%
+                  // 🔹 Сортировка папок внутри группы с годом по дате из конца displayName (формат ДД.ММ.ГГ)
+                  foldersInYear.sort((a, b) => {
+                    const cardA = folderCards[a] || {};
+                    const cardB = folderCards[b] || {};
+                    const nameA = cardA.displayName || a;
+                    const nameB = cardB.displayName || b;
+
+                    // Извлекаем дату из конца строки: ДД.ММ.ГГ
+                    const matchA = nameA.match(/(\d{2})\.(\d{2})\.(\d{2})$/);
+                    const matchB = nameB.match(/(\d{2})\.(\d{2})\.(\d{2})$/);
+
+                    // Если даты нет — отправляем в конец
+                    if (!matchA && !matchB) return 0;
+                    if (!matchA) return 1;
+                    if (!matchB) return -1;
+
+                    const [, dA, mA, yA2] = matchA;
+                    const [, dB, mB, yB2] = matchB;
+
+                    // 🔹 Окно века: 30-99 → 19##, 00-29 → 20##
+                    const yA = parseInt(yA2, 10);
+                    const yB = parseInt(yB2, 10);
+                    const fullYearA = yA >= 30 ? `19${yA2}` : `20${yA2}`;
+                    const fullYearB = yB >= 30 ? `19${yB2}` : `20${yB2}`;
+
+                    // Преобразуем в сравнимый формат YYYYMMDD
+                    const dateA = `${fullYearA}${mA}${dA}`;
+                    const dateB = `${fullYearB}${mB}${dB}`;
+
+                    return dateA.localeCompare(dateB); // по возрастанию
+                  });
+                %>
               <% } else { %>
                 <h4 class="year-header">Без года</h4>
               <% } %>
@@ -442,8 +475,7 @@
                          data-path="<%= currentPath ? currentPath + '/' + folder : folder %>"
                          onclick="updateHeaderLogo(this); window.location.href='/folder/<%= encodeURIComponent(currentPath ? currentPath + '/' + folder : folder) %>';"
                          onmouseenter="showEditButton(this)"
-                         onmouseleave="hideEditButton(this)"
-                         >
+                         onmouseleave="hideEditButton(this)">
 
                       <% if (logoUrl) { %>
                         <img src="<%= logoUrl %>?t=<%= Date.now() %>" alt="Логотип" style="height:32px; max-width: 100%; object-fit: contain; margin-top:8px;">
