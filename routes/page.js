@@ -8,15 +8,13 @@ const router = express.Router();
 
 /**
  * Универсальный парсер Fastext-кнопок.
- * Корректно обрабатывает:
- * 1. Ссылки внутри цветных span: <span class="f2 b0 nx"><a href="212.html">TEXT</a></span>
- * 2. Кнопки без ссылок: <span class="f1 b0 nx">TEXT</span>
- * 3. Цветной текст (f1-f4) и цветной фон (b1-b4)
- * 4. Строгую изоляцию внутри одного тега span
+ * 1. Ищет ссылки внутри цветных span (f1-f4, b1-b4, f6, b6).
+ * 2. Строго изолирует поиск внутри одного тега span.
+ * 3. Если цветных кнопок нет, берет последнюю ссылку внизу как Blue/Index.
  */
 function extractFastextLinks(html) {
     const links = { red: null, green: null, yellow: null, blue: null };
-    // Берем последние 800 символов (гарантированно захватывает нижнюю строку последней подстраницы)
+    // Берем последние 800 символов (зона Fastext)
     const bottom = html.slice(-800);
 
     const targets = [
@@ -30,12 +28,9 @@ function extractFastextLinks(html) {
         if (links[t.key]) continue;
 
         for (const code of t.codes) {
-            if (links[t.key]) break; // Если уже нашли для этого цвета, не ищем дальше
+            if (links[t.key]) break; // Если нашли, не ищем другие коды для этого цвета
 
-            // Регулярка ищет:
-            // 1. class="...f2..." или class="...b2..."
-            // 2. Закрывает открывающий тег span
-            // 3. Ищет href="..." ВНУТРИ этого span, ОСТАНАВЛИВАЯСЬ на </span>
+            // Регулярка: ищет class="...код..." ... href="ЦИФРЫ.html" внутри одного span
             const regex = new RegExp(
                 `class="[^"]*${code}[^"]*"[^>]*>(?:(?!<\/span>)[\\s\\S])*?href="(\\d+)\\.html"`,
                 'i'
@@ -48,8 +43,7 @@ function extractFastextLinks(html) {
         }
     }
 
-    // Fallback для синей кнопки (Index/Next), если не нашли по цвету
-    // В телетексте последняя ссылка внизу обычно ведет на оглавление или следующую страницу
+    // Fallback: если синяя кнопка не найдена по цвету, берем последнюю ссылку внизу
     if (!links.blue) {
         const allLinks = bottom.match(/href="(\d{3,4})\.html"/g);
         if (allLinks && allLinks.length > 0) {
@@ -91,7 +85,7 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
 
     const raw = await fs.readFile(htmlFile, 'utf-8');
 
-    // ✅ Извлекаем Fastext-ссылки ДО замены путей
+    // ✅ Извлекаем ссылки
     const fastextLinks = extractFastextLinks(raw);
 
     const headMatch = raw.match(/<head>([\s\S]*?)<\/head>/i);
