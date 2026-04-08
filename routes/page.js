@@ -6,51 +6,45 @@ const { isValidPath } = require('../lib/utils');
 
 const router = express.Router();
 
+/**
+ * Универсальный парсер Fastext-кнопок.
+ * Поддерживает:
+ * 1. Кнопки с цветным текстом: <span class="f1 ..."><a href="101.html">...</a></span>
+ * 2. Кнопки с цветным фоном: <span class="b1 ..."><a href="101.html">...</a></span>
+ */
 function extractFastextLinks(html) {
     const links = { red: null, green: null, yellow: null, blue: null };
+    // Берём последние 600 символов (гарантированно захватывает зону Fastext)
+    const bottom = html.slice(-600);
 
-    // Берём последние 500 символов
-    const bottom = html.slice(-500);
-
-    // Ищем И fX (цвет текста) И bX (цвет фона)
-    const patterns = [
-        { code: '1', key: 'red' },
-        { code: '2', key: 'green' },
-        { code: '3', key: 'yellow' },
-        { code: '4', key: 'blue' },
-        { code: '6', key: 'blue' }
+    const targets = [
+        { codes: ['1'], key: 'red' },
+        { codes: ['2'], key: 'green' },
+        { codes: ['3'], key: 'yellow' },
+        { codes: ['4', '6'], key: 'blue' } // f4/b4 или f6/b6 (cyan часто используется как blue)
     ];
 
-    for (const p of patterns) {
-        if (links[p.key]) continue;
+    for (const t of targets) {
+        if (links[t.key]) continue;
 
-        // Вариант 1: fX (цвет текста)
-        const regexF = new RegExp(`f${p.code}[^>]*>[^<]*<a[^>]*href="(\\d+)\\.html"`, 'i');
-        const matchF = bottom.match(regexF);
+        // Формируем паттерн: ищем f1 ИЛИ b1 (и т.д.) внутри class="..."
+        const codePattern = t.codes.map(c => `(?:f${c}|b${c})`).join('|');
+        // [\s\S]*? позволяет матчить через переносы строк и вложенные теги
+        const regex = new RegExp(`class="[^"]*${codePattern}[^"]*"[^>]*>[\\s\\S]*?href="(\\d{3,4})\\.html"`, 'i');
+        const match = bottom.match(regex);
 
-        if (matchF) {
-            links[p.key] = matchF[1];
-            continue;
-        }
-
-        // Вариант 2: bX (цвет фона)
-        const regexB = new RegExp(`b${p.code}[^>]*>[^<]*<a[^>]*href="(\\d+)\\.html"`, 'i');
-        const matchB = bottom.match(regexB);
-
-        if (matchB) {
-            links[p.key] = matchB[1];
+        if (match) {
+            links[t.key] = match[1];
         }
     }
 
-    // Fallback для blue
+    // Fallback: если синяя кнопка не найдена по цвету, берём последнюю ссылку в зоне Fastext
     if (!links.blue) {
         const allLinks = bottom.match(/href="(\d{3,4})\.html"/g);
         if (allLinks && allLinks.length > 0) {
-            const lastLink = allLinks[allLinks.length - 1];
-            const numMatch = lastLink.match(/href="(\d+)\.html"/);
-            if (numMatch) {
-                links.blue = numMatch[1];
-            }
+            const last = allLinks[allLinks.length - 1];
+            const m = last.match(/href="(\d+)\.html"/);
+            if (m) links.blue = m[1];
         }
     }
 
@@ -86,8 +80,10 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
 
     const raw = await fs.readFile(htmlFile, 'utf-8');
 
+    // ✅ Парсим Fastext ДО замены ссылок
     const fastextLinks = extractFastextLinks(raw);
 
+    // Подготовка head для iframe
     const headMatch = raw.match(/<head>([\s\S]*?)<\/head>/i);
     const headContent = headMatch ? headMatch[1] : '';
 
@@ -108,11 +104,13 @@ body{display:flex;justify-content:center;margin:0;padding:10px 20px;background:#
 
     const patchedHead = `<head>${patchedHeadContent}${flFix}</head>`;
 
+    // Фиксим ссылки на другие страницы телетекста
     const linkFixed = raw.replace(
         /href="(\d+)\.html"/g,
         (_, p) => `href="/page/${encodeURIComponent(decodedPath)}/${p}" target="_top"`
     );
 
+    // Парсинг подстраниц (subpages)
     const subpageRegex = /<div class="subpage" id="([^"]+)">([\s\S]*?)<\/div>/g;
     const subpages = [];
     let spMatch;
@@ -126,12 +124,14 @@ body{display:flex;justify-content:center;margin:0;padding:10px 20px;background:#
         subpages.push({ id: '0000', html: raw });
     }
 
+    // Хлебные крошки
     const pathParts = decodedPath.split('/').filter(Boolean);
     const breadcrumb = pathParts.map((part, i) => ({
         name: part,
         path: pathParts.slice(0, i + 1).join('/')
     }));
 
+    // Список всех страниц в папке
     const files = await fs.readdir(fullPath);
     const pageNumbers = files
         .filter(f => f.endsWith('.html'))
@@ -143,12 +143,14 @@ body{display:flex;justify-content:center;margin:0;padding:10px 20px;background:#
     const prevPage = currentIndex > 0 ? pageNumbers[currentIndex - 1] : null;
     const nextPage = currentIndex < pageNumbers.length - 1 ? pageNumbers[currentIndex + 1] : null;
 
+    // Генерация списка с проверкой превью
     const pageList = await Promise.all(pageNumbers.map(async p => {
         const pngPath = path.join(fullPath, `${p}.png`);
         const hasThumb = await fs.access(pngPath).then(() => true).catch(() => false);
         return { page: p, hasThumb };
     }));
 
+    // Логотип раздела
     const logoSvgPath = path.join(fullPath, 'logo.svg');
     const logoPngPath = path.join(fullPath, 'logo.png');
     const logoExists = await fs.access(logoSvgPath).then(() => true).catch(() => false);
