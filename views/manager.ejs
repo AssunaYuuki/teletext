@@ -22,8 +22,14 @@
 .item-actions { position: absolute; top: 4px; right: 4px; display: flex; gap: 4px; }
 .item-actions button, .item-actions a { background: rgba(0,0,0,0.5); border: none; color: #ff6666; cursor: pointer; font-size: 0.8rem; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.2s; text-decoration: none; }
 .item-actions button:hover, .item-actions a:hover { background: #ff6666; color: var(--bg); }
-.item-preview { margin: 8px 0; font-size: 1.2rem; }
+.item-preview { margin: 8px 0; font-size: 1.2rem; height: 40px; display: flex; align-items: center; justify-content: center; }
 .item-preview img { width: 40px; height: 40px; object-fit: cover; border-radius: 3px; }
+.icon-css { color: #264de4; font-weight: bold; font-family: monospace; }
+.icon-js { color: #f7df1e; text-shadow: 0 0 2px #000; font-weight: bold; }
+.icon-font { color: #ff6666; font-weight: bold; font-family: serif; }
+.icon-html { color: #e34c26; font-weight: bold; font-family: monospace; }
+.icon-img { color: #ff9966; }
+.icon-default { color: #ccc; }
 .item-name { font-size: 0.85rem; word-break: break-word; margin-top: 5px; }
 .item-size { font-size: 0.75rem; opacity: 0.7; }
 .empty-state { text-align: center; padding: 40px; opacity: 0.7; }
@@ -41,25 +47,20 @@
 .btn-action:hover { background: var(--accent); color: var(--bg); }
 .btn-cancel { background: var(--card-bg); color: var(--accent); }
 .btn-cancel:hover { background: var(--accent); color: var(--bg); }
-.move-modal-body { display: flex; flex-direction: column; gap: 10px; }
-.move-modal-input { width: 100%; padding: 8px; background: var(--hover-bg); border: 1px solid var(--accent); color: var(--fg); font-family: var(--font-mono); border-radius: 4px; }
-.move-modal-info { font-size: 0.85rem; opacity: 0.7; }
 #progress-container, #regenerate-progress-container { display: none; margin-top: 10px; }
 #progress-bar, #regenerate-progress-bar { height: 4px; background: var(--accent); width: 0%; border-radius: 2px; transition: width 0.3s ease; }
 #progress-text, #regenerate-progress-text { font-size: 0.85rem; color: var(--accent); margin-top: 5px; }
+.warning-box { background: rgba(255,204,0,0.1); border:1px solid #ffcc00; color:#ffcc00; padding:10px; border-radius:4px; margin-top:10px; font-size:0.85rem; display:none; }
 </style>
 </head>
 <body>
 <header class="nav-bar">
   <div class="breadcrumb">
-    <a href="/">🏠</a>
-    <a href="/manager/"> / teletext</a>
+    <a href="/">🏠</a> <a href="/manager/"> / teletext</a>
     <% if (breadcrumb && breadcrumb.length > 0) { %>
       <% breadcrumb.forEach((crumb, i) => { %>
-        <% if (i === breadcrumb.length - 1) { %>
-          <span> → <%= crumb.name %></span>
-        <% } else { %>
-          <a href="/manager/<%= encodeURIComponent(crumb.path) %>"> → <%= crumb.name %></a>
+        <% if (i === breadcrumb.length - 1) { %> <span> → <%= crumb.name %></span>
+        <% } else { %> <a href="/manager/<%= encodeURIComponent(crumb.path) %>"> → <%= crumb.name %></a>
         <% } %>
       <% }) %>
     <% } %>
@@ -71,41 +72,33 @@
   <div class="controls">
     <input type="text" id="folder-name" placeholder="Имя новой папки">
     <button onclick="createFolder()">➕ Создать папку</button>
-    <input type="file" id="file-input" multiple directory webkitdirectory accept=".html,.png,.svg,.txt,.css,.js,.json,.jpg,.jpeg,.gif,.webp" />
+    <input type="file" id="file-input" multiple directory webkitdirectory accept="*/*" />
     <button onclick="document.getElementById('file-input').click()">⬆️ Загрузить файлы/папки</button>
     <button onclick="pasteItem()" id="paste-btn" style="display:none;">📋 Вставить</button>
-    <button onclick="regenerateThumbnailsFast('<%= currentPath %>')">🔄 Обновить превьюшки</button>
-    <div id="regenerate-progress-container">
-      <div id="regenerate-progress-bar"></div>
-      <div id="regenerate-progress-text">Загрузка...</div>
-    </div>
+    <button onclick="regenerateThumbnailsFast('<%= currentPath %>')">🔄 Обновить</button>
+    <div id="regenerate-progress-container"><div id="regenerate-progress-bar"></div><div id="regenerate-progress-text">Загрузка...</div></div>
   </div>
 
   <div id="drop-zone" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);" ondragleave="dragLeaveHandler(event);">
     <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:var(--hover-bg);border-radius:6px;">
       <span style="font-size:1.2rem;">📁</span>
-      <span style="color:var(--accent);font-size:0.9rem;">Перетащите файлы сюда для загрузки</span>
+      <span style="color:var(--accent);font-size:0.9rem;">Перетащите файлы или ПАПКИ сюда (кроме .t42)</span>
     </div>
-    <div id="progress-container">
-      <div id="progress-bar"></div>
-      <div id="progress-text">Загрузка...</div>
-    </div>
+    <div id="progress-container"><div id="progress-bar"></div><div id="progress-text">Загрузка...</div></div>
+    <div id="warnings-container" class="warning-box"></div>
   </div>
 
   <div class="items-grid" id="items-list">
     <% if (folders.length === 0 && files.length === 0) { %>
-      <div class="empty-state">
-        <p>📁 Папка <code>teletext/<%= currentPath ? currentPath + '/' : '' %></code> пуста</p>
-        <p>Создайте папку или загрузите файлы</p>
-      </div>
+      <div class="empty-state"><p>📁 Папка пуста</p><p>Загрузите файлы (CSS, JS, TTF, HTML... кроме .t42)</p></div>
     <% } %>
 
     <% folders.forEach(folder => { %>
-      <div class="item-card folder" data-name="<%= folder.name %>" data-type="folder">
+      <div class="item-card folder">
         <div class="item-actions">
-          <button title="Переименовать" onclick="openRenameModal('<%= folder.name %>', 'folder')">✏️</button>
-          <button title="Вырезать" onclick="cutItem('<%= folder.name %>', 'folder')">✂️</button>
-          <button title="Удалить" onclick="deleteItem('<%= folder.name %>', 'folder')">✕</button>
+          <button onclick="openRenameModal('<%= folder.name %>', 'folder')">✏️</button>
+          <button onclick="cutItem('<%= folder.name %>', 'folder')">✂️</button>
+          <button onclick="deleteItem('<%= folder.name %>', 'folder')">✕</button>
         </div>
         <a href="/manager/<%= encodeURIComponent(folder.path) %>" style="display:block;text-decoration:none;color:inherit;">
           <div class="item-preview">📁</div>
@@ -116,36 +109,35 @@
     <% }) %>
 
     <% files.forEach(file => { %>
-      <div class="item-card file" data-name="<%= file.name %>" data-type="file">
+      <div class="item-card file">
         <div class="item-actions">
-          <% if (file.ext === '.html') { %>
-            <a href="/manager/edit-html/<%= encodeURIComponent(currentPath ? currentPath + '/' + file.name : file.name) %>" title="Редактировать HTML">📝</a>
-          <% } %>
-          <button title="Переименовать" onclick="openRenameModal('<%= file.name %>', 'file')">✏️</button>
-          <button title="Вырезать" onclick="cutItem('<%= file.name %>', 'file')">✂️</button>
-          <button title="Удалить" onclick="deleteItem('<%= file.name %>', 'file')">✕</button>
+          <% if (file.ext === '.html') { %><a href="/manager/edit-html/<%= encodeURIComponent(currentPath ? currentPath+'/'+file.name : file.name) %>">📝</a><% } %>
+          <button onclick="openRenameModal('<%= file.name %>', 'file')">✏️</button>
+          <button onclick="cutItem('<%= file.name %>', 'file')">✂️</button>
+          <button onclick="deleteItem('<%= file.name %>', 'file')">✕</button>
         </div>
         <div class="item-preview">
-          <% if (file.ext === '.png') { %>
-            <img src="<%= file.url %>" style="width:40px;height:40px;object-fit:cover;">
-          <% } else { %>
-            📄
-          <% } %>
+          <% const ext = file.ext.toLowerCase(); %>
+          <% if (['.png','.jpg','.jpeg','.gif','.webp','.svg'].includes(ext)) { %><span class="icon-img">🖼️</span><% }
+             else if (ext === '.css') { %><span class="icon-css">CSS</span><% }
+             else if (ext === '.js') { %><span class="icon-js">JS</span><% }
+             else if (['.ttf','.otf','.woff','.woff2'].includes(ext)) { %><span class="icon-font">Aa</span><% }
+             else if (ext === '.html') { %><span class="icon-html">HTML</span><% }
+             else { %><span class="icon-default">📄</span><% } %>
         </div>
         <div class="item-name"><%= file.name %></div>
-        <div class="item-size"><%= Math.round(file.size / 1024) %> КБ</div>
+        <div class="item-size"><%= Math.round(file.size/1024) %> КБ</div>
       </div>
     <% }) %>
   </div>
 </div>
 
-<!-- Модальное окно переименования -->
 <div id="rename-modal" class="modal">
   <div class="modal-content">
     <div class="modal-header"><div class="modal-title">✏️ Переименовать</div><span class="close" onclick="closeModal('rename-modal')">&times;</span></div>
     <div class="modal-body">
-      <p>Введите новое имя для <strong id="rename-target-name"></strong>:</p>
-      <input type="text" id="new-name-input" placeholder="Новое имя" style="width:100%;padding:8px;background:var(--hover-bg);border:1px solid var(--accent);color:var(--fg);border-radius:4px;font-family:var(--font-mono);">
+      <p>Новое имя для <strong id="rename-target-name"></strong>:</p>
+      <input type="text" id="new-name-input" style="width:100%;padding:8px;background:var(--hover-bg);border:1px solid var(--accent);color:var(--fg);border-radius:4px;font-family:var(--font-mono);">
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeModal('rename-modal')">Отмена</button>
@@ -153,27 +145,11 @@
     </div>
   </div>
 </div>
-
 <footer><a href="/" class="btn">🏠 На главную</a></footer>
 
 <script>
-// 🛡️ Перехват 401 → редирект на страницу входа
-const _origFetch = window.fetch;
-window.fetch = async (...args) => {
-  const res = await _origFetch(...args);
-  if (res.status === 401) {
-    try {
-      const data = await res.json().catch(() => ({}));
-      window.location.href = data.redirect || '/login';
-    } catch { window.location.href = '/login'; }
-    return res;
-  }
-  return res;
-};
-
 const currentPath = `<%= currentPath %>`;
-let currentOperationTarget = null;
-let currentOperationType = null;
+let currentOperationTarget = null, currentOperationType = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   if (localStorage.getItem('cutItemData')) document.getElementById('paste-btn').style.display = 'inline-block';
@@ -185,19 +161,15 @@ function openRenameModal(name, type) {
   document.getElementById('new-name-input').value = name;
   document.getElementById('rename-modal').style.display = 'flex';
 }
-
-function closeModal(modalId) {
-  document.getElementById(modalId).style.display = 'none';
-  currentOperationTarget = null; currentOperationType = null;
-}
+function closeModal(id) { document.getElementById(id).style.display = 'none'; currentOperationTarget = null; currentOperationType = null; }
 
 async function performRename() {
   const newName = document.getElementById('new-name-input').value.trim();
-  if (!newName || !currentOperationTarget || !currentOperationType) return alert('Введите корректное имя.');
+  if (!newName || !currentOperationTarget) return alert('Введите имя');
   try {
     const res = await fetch('/rename-item/' + encodeURIComponent(currentPath), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ oldName: currentOperationTarget, newName: newName, type: currentOperationType })
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ oldName: currentOperationTarget, newName, type: currentOperationType })
     });
     const data = await res.json();
     if (res.ok) { closeModal('rename-modal'); location.reload(); } else alert(data.error || 'Ошибка');
@@ -206,105 +178,171 @@ async function performRename() {
 
 async function cutItem(name, type) {
   localStorage.setItem('cutItemData', JSON.stringify({ name, type, sourcePath: currentPath }));
-  alert(`✅ Элемент "${name}" вырезан. Перейдите в нужную папку и нажмите "Вставить".`);
   document.getElementById('paste-btn').style.display = 'inline-block';
+  alert(`✅ "${name}" вырезан. Нажмите "Вставить" в нужной папке.`);
 }
 
 async function pasteItem() {
-  const saved = localStorage.getItem('cutItemData');
-  if (!saved) return alert('Нет вырезанного элемента!');
-  const data = JSON.parse(saved);
-  if (data.sourcePath === currentPath) return alert('Нельзя вставить в ту же папку.');
+  const data = JSON.parse(localStorage.getItem('cutItemData'));
+  if (!data || data.sourcePath === currentPath) return alert('Нет данных или та же папка');
   try {
     const res = await fetch('/move-item/' + encodeURIComponent(data.sourcePath), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ itemName: data.name, targetPath: currentPath, type: data.type })
     });
-    const json = await res.json();
-    if (res.ok) { localStorage.removeItem('cutItemData'); document.getElementById('paste-btn').style.display = 'none'; location.reload(); } else alert(json.error || 'Ошибка');
+    if (res.ok) { localStorage.removeItem('cutItemData'); document.getElementById('paste-btn').style.display = 'none'; location.reload(); }
+    else alert((await res.json()).error);
   } catch { alert('Ошибка сети'); }
 }
 
 async function createFolder() {
   const name = document.getElementById('folder-name').value.trim();
-  if (!name) return alert('Введите имя папки');
+  if (!name) return alert('Введите имя');
   try {
-    const res = await fetch(`/create-folder/${encodeURIComponent(currentPath)}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name })
-    });
-    const data = await res.json();
-    if (data.success) location.reload(); else alert(data.error || 'Ошибка');
+    const res = await fetch(`/create-folder/${encodeURIComponent(currentPath)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name}) });
+    if ((await res.json()).success) location.reload(); else alert((await res.json()).error);
   } catch { alert('Ошибка сети'); }
 }
 
 document.getElementById('file-input').onchange = async (e) => {
-  const files = Array.from(e.target.files); if (!files.length) return;
-  const formData = new FormData(); files.forEach(f => formData.append('files', f));
+  const files = Array.from(e.target.files).filter(f => !f.name.toLowerCase().endsWith('.t42'));
+  const t42Count = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.t42')).length;
+  if (t42Count > 0) console.log(`Пропущено .t42 файлов: ${t42Count}`);
+  if (!files.length) return alert('Нет файлов для загрузки (все .t42 пропущены)');
+  const fd = new FormData(); files.forEach(f => fd.append('files', f));
   try {
-    const res = await fetch(`/upload/${encodeURIComponent(currentPath)}`, { method: 'POST', body: formData });
-    const data = await res.json(); if (data.success || data.saved) location.reload(); else alert(data.error || 'Ошибка');
+    const res = await fetch(`/upload/${encodeURIComponent(currentPath)}`, { method:'POST', body: fd });
+    const data = await res.json();
+    if (data.success) {
+      if (data.skippedCount) console.log(`Пропущено файлов: ${data.skippedCount}`);
+      location.reload();
+    } else alert(data.error || 'Ошибка');
   } catch { alert('Ошибка сети'); }
 };
 
-function dragOverHandler(ev) { ev.preventDefault(); document.getElementById('drop-zone').classList.add('drag-over'); }
-function dragLeaveHandler(ev) { ev.preventDefault(); document.getElementById('drop-zone').classList.remove('drag-over'); }
-function dropHandler(ev) {
-  ev.preventDefault(); document.getElementById('drop-zone').classList.remove('drag-over');
-  const items = ev.dataTransfer.items;
-  if (items) for (let i = 0; i < items.length; i++) if (items[i].webkitGetAsEntry()?.isDirectory) return alert('Загрузка папок через drag\'n\'drop не поддерживается. Используйте кнопку загрузки.');
-  const files = Array.from(ev.dataTransfer.files); if (!files.length) return;
-  const formData = new FormData(); files.forEach(f => formData.append('files', f)); uploadFiles(formData);
+function dragOverHandler(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag-over'); }
+function dragLeaveHandler(e) { e.preventDefault(); document.getElementById('drop-zone').classList.remove('drag-over'); }
+
+async function dropHandler(e) {
+    e.preventDefault();
+    document.getElementById('drop-zone').classList.remove('drag-over');
+
+    const items = e.dataTransfer.items;
+    if (!items) return;
+
+    const filesToUpload = [];
+    let rootFolderName = null;
+    let totalFound = 0;
+    let t42Skipped = 0;
+
+    const readEntry = (entry) => new Promise(resolve => {
+        if (entry.isFile) {
+            entry.file(file => {
+                totalFound++;
+                if (!file.name.toLowerCase().endsWith('.t42')) {
+                    filesToUpload.push(file);
+                } else {
+                    t42Skipped++;
+                }
+                resolve();
+            });
+        } else if (entry.isDirectory) {
+            if (!rootFolderName) rootFolderName = entry.name;
+            const dirReader = entry.createReader();
+
+            // Читаем все entries (браузеры могут возвращать частями)
+            const readAllEntries = () => {
+                return new Promise((res) => {
+                    const allEntries = [];
+                    const readBatch = () => {
+                        dirReader.readEntries(entries => {
+                            if (entries.length === 0) {
+                                res(allEntries);
+                            } else {
+                                allEntries.push(...entries);
+                                readBatch();
+                            }
+                        });
+                    };
+                    readBatch();
+                });
+            };
+
+            readAllEntries().then(async entries => {
+                for (const ent of entries) {
+                    await readEntry(ent);
+                }
+                resolve();
+            });
+        } else {
+            resolve();
+        }
+    });
+
+
+  await Promise.all(Array.from(items).map(i => i.webkitGetAsEntry()).filter(Boolean).map(readEntry));
+
+  if (!filesToUpload.length) return alert('Нет файлов для загрузки (все .t42 пропущены)');
+
+  const fd = new FormData();
+  filesToUpload.forEach(f => fd.append('files', f));
+
+  if (rootFolderName) {
+    fd.append('targetFolderName', rootFolderName);
+  }
+
+  uploadFiles(fd);
 }
 
-async function uploadFiles(formData) {
-  const container = document.getElementById('progress-container');
-  const bar = document.getElementById('progress-bar');
-  const text = document.getElementById('progress-text');
-  container.style.display = 'block'; let progress = 0;
-  const interval = setInterval(() => { if (progress < 90) { progress += 5; bar.style.width = progress + '%'; text.textContent = `Загрузка... ${progress}%`; } }, 200);
+async function uploadFiles(fd) {
+  const box = document.getElementById('progress-container'), bar = document.getElementById('progress-bar'), txt = document.getElementById('progress-text'), warn = document.getElementById('warnings-container');
+  box.style.display = 'block'; warn.style.display = 'none';
+  let p = 0; const iv = setInterval(() => { if(p<90){p+=5; bar.style.width=p+'%'; txt.textContent=`Загрузка... ${p}%`; } }, 200);
   try {
-    const res = await fetch(`/upload/${encodeURIComponent(currentPath)}`, { method: 'POST', body: formData });
-    clearInterval(interval); const data = await res.json();
-    if (data.success || data.saved) { bar.style.width = '100%'; text.textContent = '✅ Завершено!'; setTimeout(location.reload, 500); }
-    else { bar.style.width = '100%'; text.textContent = '❌ Ошибка'; setTimeout(() => { alert(data.error || 'Ошибка'); container.style.display = 'none'; }, 1000); }
-  } catch { clearInterval(interval); bar.style.width = '100%'; text.textContent = '❌ Ошибка сети'; setTimeout(() => { alert('Ошибка сети'); container.style.display = 'none'; }, 1000); }
+    const res = await fetch(`/upload/${encodeURIComponent(currentPath)}`, { method:'POST', body: fd });
+    clearInterval(iv); const data = await res.json();
+    if (data.success) {
+      bar.style.width='100%'; txt.textContent='✅ Готово!';
+      if (data.warnings) { warn.style.display='block'; warn.innerHTML='<b>Внимание:</b><br>'+data.warnings.join('<br>'); }
+      if (data.skippedCount) { warn.style.display='block'; warn.innerHTML += `<br>Пропущено .t42 файлов: ${data.skippedCount}`; }
+      setTimeout(location.reload, 1500);
+    } else {
+      bar.style.width='100%'; txt.textContent='❌ Ошибка';
+      setTimeout(()=>{ alert(data.error); box.style.display='none'; }, 2000);
+    }
+  } catch { clearInterval(iv); alert('Ошибка сети'); box.style.display='none'; }
 }
 
 async function deleteItem(name, type) {
-  const txt = type === 'folder' ? `⚠️ Удалить папку "${name}" и всё содержимое?` : `Удалить файл "${name}"?`;
-  if (!confirm(txt)) return;
+  if (!confirm(type==='folder' ? `Удалить "${name}" и всё внутри?` : `Удалить "${name}"?`)) return;
   try {
-    const res = await fetch('/delete-item/' + encodeURIComponent(currentPath), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, type })
-    });
-    const data = await res.json(); if (data.success) location.reload(); else alert(data.error || 'Ошибка');
+    const res = await fetch('/delete-item/' + encodeURIComponent(currentPath), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name,type}) });
+    if ((await res.json()).success) location.reload(); else alert((await res.json()).error);
   } catch { alert('Ошибка сети'); }
 }
 
 async function regenerateThumbnailsFast(path) {
-  if (!confirm('Перегенерировать превьюшки в этой папке?')) return;
-  const container = document.getElementById('regenerate-progress-container');
-  const bar = document.getElementById('regenerate-progress-bar');
-  const text = document.getElementById('regenerate-progress-text');
-  container.style.display = 'block';
+  if (!confirm('Перегенерировать превью?')) return;
+  const c = document.getElementById('regenerate-progress-container'), b = document.getElementById('regenerate-progress-bar'), t = document.getElementById('regenerate-progress-text');
+  c.style.display = 'block';
   try {
-    const response = await fetch(`/manager/regenerate-thumbnails-fast/${encodeURIComponent(path)}`, { method: 'POST' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = '';
-    while (true) {
-      const { done, value } = await reader.read(); if (done) break;
-      buffer += decoder.decode(value, { stream: true }); const lines = buffer.split('\n'); buffer = lines.pop();
-      for (const line of lines) {
-        if (!line.trim()) continue;
+    const r = await fetch(`/manager/regenerate-thumbnails-fast/${encodeURIComponent(path)}`, {method:'POST'});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const reader = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+    while(true) {
+      const {done, value} = await reader.read(); if(done) break;
+      buf += dec.decode(value, {stream:true}); const lines = buf.split('\n'); buf = lines.pop();
+      for (const l of lines) {
+        if (!l.trim()) continue;
         try {
-          const data = JSON.parse(line.trim());
-          if (data.progress !== undefined) { bar.style.width = data.progress + '%'; text.textContent = `Перегенерация... ${data.progress}% (${data.current}/${data.total})`; }
-          if (data.success === true) { bar.style.width = '100%'; text.textContent = '✅ Готово!'; setTimeout(location.reload, 500); return; }
-          if (data.success === false) { throw new Error(data.error || 'Ошибка генерации'); }
-        } catch (e) { console.error('Parse error:', line, e); }
+          const d = JSON.parse(l.trim());
+          if (d.progress !== undefined) { b.style.width=d.progress+'%'; t.textContent=`Генерация... ${d.progress}%`; }
+          if (d.success === true) { b.style.width='100%'; t.textContent='✅ Готово!'; setTimeout(location.reload,500); return; }
+          if (d.success === false) throw new Error(d.error);
+        } catch(e) { console.error(e); }
       }
     }
-  } catch (err) { text.textContent = '❌ ' + err.message; setTimeout(() => container.style.display = 'none', 2000); }
+  } catch(e) { t.textContent='❌ '+e.message; setTimeout(()=>c.style.display='none',2000); }
 }
 </script>
 </body>

@@ -7,296 +7,200 @@ const { uploadFiles } = require('../middleware/upload');
 
 const router = express.Router();
 
-// ==========================================
-// ⚠️ ВАЖНО: Специфичные маршруты идут ПЕРВЫМИ
-// ==========================================
-
-// ✏️ GET: Открыть редактор для файла
 router.get('/manager/edit-html/*', asyncHandler(async (req, res) => {
     const filePath = req.params[0];
-    if (!isValidPath(filePath)) {
-        throw new AppError('Недопустимый путь', 400);
-    }
-
+    if (!isValidPath(filePath)) throw new AppError('Недопустимый путь', 400);
     const fullPath = path.join(__dirname, '../teletext', filePath);
-    const stats = await fs.stat(fullPath).catch(() => null);
-
-    const content = await fs.readFile(fullPath, 'utf-8');
-    const parentPath = path.dirname(filePath);
-
+    const content = await fs.readFile(fullPath, 'utf-8').catch(() => '');
     res.render('editor', {
-        filePath: filePath,
+        filePath,
         fileName: path.basename(fullPath),
-        content: content,
-        parentPath: parentPath === '.' ? '' : parentPath,
+        content,
+        parentPath: path.dirname(filePath) === '.' ? '' : path.dirname(filePath),
         disableCopy: true
     });
 }));
 
-// 💾 POST: Сохранить файл
 router.post('/manager/save-html/*', asyncHandler(async (req, res) => {
     const filePath = req.params[0];
-    if (!isValidPath(filePath)) {
-        throw new AppError('Недопустимый путь', 400);
-    }
-
+    if (!isValidPath(filePath)) throw new AppError('Недопустимый путь', 400);
     const fullPath = path.join(__dirname, '../teletext', filePath);
-    const { content } = req.body;
-
-    if (typeof content !== 'string') {
-        throw new AppError('Неверный формат данных', 400);
-    }
-
-    await fs.writeFile(fullPath, content, 'utf-8');
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    await fs.writeFile(fullPath, req.body.content, 'utf-8');
     logAction('FILE_SAVED', fullPath);
-
-    res.json({ success: true, message: 'Файл сохранён' });
+    res.json({ success: true });
 }));
 
-// ==========================================
-// 📂 Основной маршрут менеджера
-// ==========================================
-
-// GET: Список файлов и папок (Самый общий, стоит после конкретных)
 router.get(['/manager', '/manager/*'], asyncHandler(async (req, res) => {
     const decodedPath = req.params[0] || '';
-    if (!isValidPath(decodedPath)) {
-        throw new AppError('Недопустимый путь', 400);
-    }
-
+    if (!isValidPath(decodedPath)) throw new AppError('Недопустимый путь', 400);
     const fullPath = path.join(__dirname, '../teletext', decodedPath);
 
-    // ✅ Авто-создание папки teletext, если её нет
-    try {
-        await fs.mkdir(fullPath, { recursive: true });
-    } catch (err) {
-        if (err.code !== 'EEXIST') throw err;
-    }
-
-    const stats = await fs.stat(fullPath).catch(() => null);
-    if (!stats || !stats.isDirectory()) {
-        throw new AppError('Папка не найдена', 404);
-    }
+    await fs.mkdir(fullPath, { recursive: true });
 
     const items = await fs.readdir(fullPath);
-    const folders = [];
-    const files = [];
+    const folders = [], files = [];
 
-    await Promise.all(items.map(async item => {
+    for (const item of items) {
+        if (item.startsWith('.')) continue;
         const itemPath = path.join(fullPath, item);
-        const itemStats = await fs.stat(itemPath);
-        if (itemStats.isDirectory()) {
-            const subItems = await fs.readdir(itemPath);
+        const stats = await fs.stat(itemPath);
+
+        if (stats.isDirectory()) {
             folders.push({
                 name: item,
-                path: decodedPath ? `${decodedPath}/${item}` : item,
-                isEmpty: subItems.length === 0
+                path: decodedPath ? `${decodedPath}/${item}` : item
             });
         } else {
             files.push({
                 name: item,
-                size: itemStats.size,
+                size: stats.size,
                 url: `/teletext/${decodedPath ? encodeURIComponent(decodedPath) + '/' : ''}${encodeURIComponent(item)}`,
                 ext: path.extname(item).toLowerCase()
             });
         }
-    }));
+    }
+
+    folders.sort((a,b) => a.name.localeCompare(b.name));
+    files.sort((a,b) => a.name.localeCompare(b.name));
 
     const pathParts = decodedPath.split('/').filter(Boolean);
-    const breadcrumb = pathParts.map((part, i) => ({
-        name: part,
-        path: pathParts.slice(0, i + 1).join('/')
-    }));
+    const breadcrumb = pathParts.map((p,i) => ({ name: p, path: pathParts.slice(0,i+1).join('/') }));
 
-    res.render('manager', {
-        folders,
-        files,
-        currentPath: decodedPath,
-        breadcrumb,
-        disableCopy: true
-    });
+    res.render('manager', { folders, files, currentPath: decodedPath, breadcrumb, disableCopy: true });
 }));
 
-// ==========================================
-// 🔧 Действия (CRUD)
-// ==========================================
-
-// ➕ POST: Создать папку
 router.post('/create-folder/*', asyncHandler(async (req, res) => {
-    const requestedPath = req.params[0] || '';
-    const { name } = req.body;
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-        return res.status(400).json({ error: 'Имя папки обязательно' });
-    }
-    if (!isValidPath(requestedPath)) {
-        return res.status(400).json({ error: 'Недопустимый путь' });
-    }
-
-    const cleanName = name.trim()
-        .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
-        .replace(/\s+/g, '_');
-
-    const fullPath = path.join(__dirname, '../teletext', requestedPath);
-
-    // Создаем родительскую папку если нет
-    await fs.mkdir(fullPath, { recursive: true });
-
-    const dirPath = path.join(fullPath, cleanName);
-    const dirExists = await fs.access(dirPath).then(() => true).catch(() => false);
-    if (dirExists) {
-        return res.status(400).json({ error: 'Папка уже существует' });
-    }
-
-    try {
-        await fs.mkdir(dirPath, { recursive: true });
-        logAction('FOLDER_CREATED', `teletext/${requestedPath ? requestedPath + '/' : ''}${cleanName}`);
-        res.json({ success: true, name: cleanName });
-    } catch (err) {
-        throw new AppError(`Не удалось создать: ${err.message}`, 500);
-    }
+    const reqPath = req.params[0] || '';
+    const clean = req.body.name.trim().replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_').replace(/\s+/g, '_');
+    const target = path.join(__dirname, '../teletext', reqPath, clean);
+    await fs.mkdir(target, { recursive: true });
+    res.json({ success: true });
 }));
 
-// 🗑️ POST: Удалить элемент
 router.post('/delete-item/*', asyncHandler(async (req, res) => {
-    const requestedPath = req.params[0] || '';
-    const { name, type } = req.body;
-    if (!name || !type || !['file', 'folder'].includes(type)) {
-        return res.status(400).json({ error: 'Некорректные данные' });
-    }
-    if (!isValidPath(requestedPath)) {
-        return res.status(400).json({ error: 'Недопустимый путь' });
-    }
-
-    const cleanName = path.basename(name);
-    const fullPath = path.join(__dirname, '../teletext', requestedPath, cleanName);
-    const itemExists = await fs.access(fullPath).then(() => true).catch(() => false);
-    if (!itemExists) {
-        return res.status(404).json({ error: 'Объект не найден' });
-    }
-
-    try {
-        if (type === 'file') {
-            await fs.unlink(fullPath);
-            logAction('FILE_DELETED', `teletext/${requestedPath ? requestedPath + '/' : ''}${cleanName}`);
-        } else {
-            await fs.rm(fullPath, { recursive: true, force: true });
-            logAction('FOLDER_DELETED', `teletext/${requestedPath ? requestedPath + '/' : ''}${cleanName}`);
-        }
-        res.json({ success: true });
-    } catch (err) {
-        throw new AppError(`Ошибка удаления: ${err.message}`, 500);
-    }
+    const reqPath = req.params[0] || '';
+    const target = path.join(__dirname, '../teletext', reqPath, path.basename(req.body.name));
+    req.body.type === 'file' ? await fs.unlink(target) : await fs.rm(target, { recursive:true });
+    res.json({ success: true });
 }));
 
-// ✏️ POST: Переименовать
 router.post('/rename-item/*', asyncHandler(async (req, res) => {
-    const requestedPath = req.params[0] || '';
-    const { oldName, newName, type } = req.body;
-    if (!isValidPath(requestedPath) || !oldName || !newName || !['file', 'folder'].includes(type)) {
-        return res.status(400).json({ error: 'Некорректные данные' });
-    }
-
-    const cleanOldName = path.basename(oldName);
-    const cleanNewName = path.basename(newName);
-    const sourcePath = path.join(__dirname, '../teletext', requestedPath, cleanOldName);
-    const targetPath = path.join(__dirname, '../teletext', requestedPath, cleanNewName);
-
-    const sourceExists = await fs.access(sourcePath).then(() => true).catch(() => false);
-    if (!sourceExists) {
-        return res.status(404).json({ error: 'Объект не найден' });
-    }
-
-    const targetExists = await fs.access(targetPath).then(() => true).catch(() => false);
-    if (targetExists) {
-        return res.status(400).json({ error: 'Объект с таким именем уже существует' });
-    }
-
-    try {
-        await fs.rename(sourcePath, targetPath);
-        logAction('ITEM_RENAMED', `${type} ${sourcePath} -> ${targetPath}`);
-        res.json({ success: true });
-    } catch (err) {
-        throw new AppError(`Ошибка переименования: ${err.message}`, 500);
-    }
+    const reqPath = req.params[0] || '';
+    const src = path.join(__dirname, '../teletext', reqPath, path.basename(req.body.oldName));
+    const dst = path.join(__dirname, '../teletext', reqPath, path.basename(req.body.newName));
+    await fs.rename(src, dst);
+    res.json({ success: true });
 }));
 
-// 🚚 POST: Переместить
 router.post('/move-item/*', asyncHandler(async (req, res) => {
-    const requestedPath = req.params[0] || '';
-    const { itemName, targetPath, type } = req.body;
-    if (!isValidPath(requestedPath) || !itemName || !['file', 'folder'].includes(type)) {
-        return res.status(400).json({ error: 'Некорректные данные' });
-    }
-
-    const finalTargetPath = targetPath ? path.join(targetPath) : requestedPath;
-    if (!isValidPath(finalTargetPath)) {
-        return res.status(400).json({ error: 'Недопустимый путь назначения' });
-    }
-
-    const cleanItemName = path.basename(itemName);
-    const sourcePath = path.join(__dirname, '../teletext', requestedPath, cleanItemName);
-    const targetDirPath = path.join(__dirname, '../teletext', finalTargetPath);
-    const targetItemPath = path.join(targetDirPath, cleanItemName);
-
-    const sourceExists = await fs.access(sourcePath).then(() => true).catch(() => false);
-    if (!sourceExists) {
-        return res.status(404).json({ error: 'Объект не найден' });
-    }
-
-    try {
-        await fs.rename(sourcePath, targetItemPath);
-        logAction('ITEM_MOVED', `${type} ${sourcePath} -> ${targetItemPath}`);
-        res.json({ success: true });
-    } catch (err) {
-        throw new AppError(`Ошибка перемещения: ${err.message}`, 500);
-    }
+    const reqPath = req.params[0] || '';
+    const targetDir = req.body.targetPath ? path.join(__dirname, '../teletext', req.body.targetPath) : path.join(__dirname, '../teletext', reqPath);
+    const src = path.join(__dirname, '../teletext', reqPath, path.basename(req.body.itemName));
+    const dst = path.join(targetDir, path.basename(req.body.itemName));
+    await fs.rename(src, dst);
+    res.json({ success: true });
 }));
 
-// ⬆️ POST: Загрузка файлов
+// ⬆️ ЗАГРУЗКА: С ЗАЩИТОЙ ОТ ДУБЛИКАТОВ И ПОЛНОЙ ОБРАБОТКОЙ
 router.post('/upload/*', uploadFiles.any(), asyncHandler(async (req, res) => {
-    const requestedPath = req.params[0] || '';
-    if (!isValidPath(requestedPath)) {
-        return res.status(400).json({ error: 'Недопустимый путь' });
-    }
+    const reqPath = req.params[0] || '';
+    const baseDir = path.join(__dirname, '../teletext', reqPath);
+    await fs.mkdir(baseDir, { recursive: true });
 
-    const fullPath = path.join(__dirname, '../teletext', requestedPath);
-
-    // Создаем папку если нет
-    await fs.mkdir(fullPath, { recursive: true });
-
-    const stats = await fs.stat(fullPath).catch(() => null);
-    if (!stats || !stats.isDirectory()) {
-        return res.status(404).json({ error: 'Папка не найдена' });
-    }
+    console.log(`\n[UPLOAD] ========== НАЧАЛО ==========`);
+    console.log(`[UPLOAD] Путь: ${baseDir}`);
+    console.log(`[UPLOAD] Получено файлов от клиента: ${req.files ? req.files.length : 0}`);
 
     if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ error: 'Нет файлов для загрузки' });
+        return res.status(400).json({ error: 'Нет файлов' });
     }
 
-    const errors = [];
-    const saved = [];
-    for (const file of req.files) {
+    const isFolderUpload = req.body.targetFolderName && req.body.targetFolderName.trim() !== '';
+    let destDir = baseDir;
+    let folderName = '';
+
+    if (isFolderUpload) {
+        folderName = req.body.targetFolderName.trim()
+            .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
+            .replace(/\s+/g, '_');
+        destDir = path.join(baseDir, folderName);
+        await fs.mkdir(destDir, { recursive: true });
+        console.log(`[UPLOAD] Загрузка папки: "${folderName}"`);
+    }
+
+    const errors = [], saved = [], skipped = [];
+    const usedNames = new Set(); // Для отслеживания уникальных имен
+
+    for (let i = 0; i < req.files.length; i++) {
+        const file = req.files[i];
+
         try {
-            let targetName = path.basename(file.originalname);
-            if (targetName.includes('..') || targetName.startsWith('/')) {
-                throw new Error('Недопустимое имя файла');
+            let fileName = path.basename(file.originalname);
+            const ext = path.extname(fileName).toLowerCase();
+
+            // Пропускаем .t42
+            if (ext === '.t42') {
+                skipped.push(fileName);
+                await fs.unlink(file.path).catch(()=>{});
+                continue;
             }
-            targetName = targetName
-                .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
-                .replace(/\s+/g, '_');
-            await fs.copyFile(file.path, path.join(fullPath, targetName));
+
+            // Очищаем имя
+            const nameOnly = path.basename(fileName, ext);
+            let cleanName = nameOnly.replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_').replace(/\s+/g, '_');
+
+            if (!cleanName) cleanName = `file_${Date.now()}_${i}`;
+
+            fileName = cleanName + ext;
+
+            // ✅ ЗАЩИТА ОТ ДУБЛИКАТОВ: если имя уже занято, добавляем номер
+            let finalFileName = fileName;
+            let counter = 1;
+            while (usedNames.has(finalFileName.toLowerCase())) {
+                finalFileName = `${cleanName}_${counter}${ext}`;
+                counter++;
+            }
+            usedNames.add(finalFileName.toLowerCase());
+
+            const finalPath = path.join(destDir, finalFileName);
+
+            await fs.copyFile(file.path, finalPath);
             await fs.unlink(file.path);
-            saved.push(targetName);
-            logAction('FILE_UPLOADED', `${targetName} → teletext/${requestedPath ? requestedPath + '/' : ''}`);
+
+            // Проверяем что файл действительно создался
+            const exists = await fs.access(finalPath).then(() => true).catch(() => false);
+            if (!exists) {
+                throw new Error('Файл не создан после копирования');
+            }
+
+            const stats = await fs.stat(finalPath);
+            console.log(`[${i+1}/${req.files.length}] ✅ ${finalFileName} (${stats.size} байт)`);
+
+            saved.push(finalFileName);
+
         } catch (err) {
+            console.error(`[${i+1}/${req.files.length}] ❌ ${file.originalname}: ${err.message}`);
+            await fs.unlink(file.path).catch(()=>{});
             errors.push(`${file.originalname}: ${err.message}`);
         }
     }
 
-    if (errors.length > 0) {
-        return res.status(400).json({ error: 'Частичная ошибка загрузки', errors, saved });
-    }
-    res.json({ success: true, saved });
+    console.log(`\n[UPLOAD] ========== РЕЗУЛЬТАТЫ ==========`);
+    console.log(`[UPLOAD] Всего получено: ${req.files.length}`);
+    console.log(`[UPLOAD] Сохранено: ${saved.length}`);
+    console.log(`[UPLOAD] Пропущено (.t42): ${skipped.length}`);
+    console.log(`[UPLOAD] Ошибок: ${errors.length}`);
+    console.log(`[UPLOAD] ==================================\n`);
+
+    res.json({
+        success: saved.length > 0,
+        saved,
+        warnings: errors.length ? errors : undefined,
+        skippedCount: skipped.length,
+        totalReceived: req.files.length,
+        totalSaved: saved.length
+    });
 }));
 
 module.exports = router;

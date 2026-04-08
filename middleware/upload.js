@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const os = require('os');
 
+// Для логотипов (SVG/PNG/JPG)
 const upload = multer({
     storage: multer.diskStorage({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
@@ -16,10 +17,12 @@ const upload = multer({
     }
 });
 
+// Для файлов менеджера - ПРИНИМАЕМ ВСЁ
 const uploadFiles = multer({
     storage: multer.diskStorage({
         destination: (req, file, cb) => cb(null, os.tmpdir()),
         filename: (req, file, cb) => {
+            // Сохраняем оригинальное имя с префиксом timestamp
             const cleanName = file.originalname
                 .replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s._\-()]/g, '_')
                 .replace(/\s+/g, '_');
@@ -27,15 +30,12 @@ const uploadFiles = multer({
         }
     }),
     fileFilter: (req, file, cb) => {
-        const allowed = ['.html', '.png', '.svg', '.txt', '.css', '.js', '.json', '.jpg', '.jpeg', '.gif', '.webp', '.ttf'];
-        const ext = path.extname(file.originalname).toLowerCase();
-        if (allowed.includes(ext)) {
-            cb(null, true);
-        } else {
-            cb(new Error(`Запрещённый тип файла: ${ext}. Разрешены: ${allowed.join(', ')}`));
-        }
+        // ✅ ПРИНИМАЕМ ЛЮБЫЕ ФАЙЛЫ без фильтрации
+        cb(null, true);
     },
-    limits: { fileSize: 5 * 1024 * 1024 }
+    limits: {
+        fileSize: 50 * 1024 * 1024 // 50MB лимит
+    }
 });
 
 module.exports = { upload, uploadFiles };
