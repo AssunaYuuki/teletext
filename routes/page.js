@@ -7,38 +7,51 @@ const { isValidPath } = require('../lib/utils');
 const router = express.Router();
 
 /**
- * Универсальный парсер Fastext-кнопок.
+ * Универсальный парсер Fastext-кнопок с защитой от перескока между тегами.
  * Поддерживает:
- * 1. Кнопки с цветным текстом: <span class="f1 ..."><a href="101.html">...</a></span>
- * 2. Кнопки с цветным фоном: <span class="b1 ..."><a href="101.html">...</a></span>
+ * 1. Цветной текст: class="...f1..."
+ * 2. Цветной фон: class="...b1..."
+ * 3. Строгую изоляцию внутри одного span (чтобы Красная не брала ссылку Зеленой)
  */
 function extractFastextLinks(html) {
     const links = { red: null, green: null, yellow: null, blue: null };
-    // Берём последние 600 символов (гарантированно захватывает зону Fastext)
+
+    // Берём только конец файла, где обычно находятся кнопки
     const bottom = html.slice(-600);
 
     const targets = [
-        { codes: ['1'], key: 'red' },
-        { codes: ['2'], key: 'green' },
-        { codes: ['3'], key: 'yellow' },
-        { codes: ['4', '6'], key: 'blue' } // f4/b4 или f6/b6 (cyan часто используется как blue)
+        { codes: ['f1', 'b1'], key: 'red' },
+        { codes: ['f2', 'b2'], key: 'green' },
+        { codes: ['f3', 'b3'], key: 'yellow' },
+        { codes: ['f4', 'b4', 'f6', 'b6'], key: 'blue' }
     ];
 
     for (const t of targets) {
+        // Если кнопку этого цвета уже нашли, пропускаем
         if (links[t.key]) continue;
 
-        // Формируем паттерн: ищем f1 ИЛИ b1 (и т.д.) внутри class="..."
-        const codePattern = t.codes.map(c => `(?:f${c}|b${c})`).join('|');
-        // [\s\S]*? позволяет матчить через переносы строк и вложенные теги
-        const regex = new RegExp(`class="[^"]*${codePattern}[^"]*"[^>]*>[\\s\\S]*?href="(\\d{3,4})\\.html"`, 'i');
-        const match = bottom.match(regex);
+        for (const code of t.codes) {
+            if (links[t.key]) break; // Если нашли в первой итерации (например f1), не ищем b1
 
-        if (match) {
-            links[t.key] = match[1];
+            // РЕГУЛЯРКА:
+            // 1. class="...code..." - находит блок с цветом
+            // 2. [^>]*> - завершает открывающий тег
+            // 3. (?:(?!<\/span>)[\s\S])*? - ищет контент, НО ОСТАНАВЛИВАЕТСЯ, если встречает </span>
+            // 4. href="(\d+).html" - находит ссылку внутри этого блока
+            const regex = new RegExp(
+                `class="[^"]*${code}[^"]*"[^>]*>(?:(?!<\/span>)[\\s\\S])*?href="(\\d+)\\.html"`,
+                'i'
+            );
+
+            const match = bottom.match(regex);
+            if (match) {
+                links[t.key] = match[1];
+            }
         }
     }
 
-    // Fallback: если синяя кнопка не найдена по цвету, берём последнюю ссылку в зоне Fastext
+    // Fallback: если синяя кнопка (Index/Next) не найдена по цвету,
+    // берём последнюю ссылку в зоне Fastext.
     if (!links.blue) {
         const allLinks = bottom.match(/href="(\d{3,4})\.html"/g);
         if (allLinks && allLinks.length > 0) {
@@ -80,10 +93,9 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
 
     const raw = await fs.readFile(htmlFile, 'utf-8');
 
-    // ✅ Парсим Fastext ДО замены ссылок
+    // ✅ Извлекаем ссылки ДО того, как они будут изменены
     const fastextLinks = extractFastextLinks(raw);
 
-    // Подготовка head для iframe
     const headMatch = raw.match(/<head>([\s\S]*?)<\/head>/i);
     const headContent = headMatch ? headMatch[1] : '';
 
@@ -104,13 +116,11 @@ body{display:flex;justify-content:center;margin:0;padding:10px 20px;background:#
 
     const patchedHead = `<head>${patchedHeadContent}${flFix}</head>`;
 
-    // Фиксим ссылки на другие страницы телетекста
     const linkFixed = raw.replace(
         /href="(\d+)\.html"/g,
         (_, p) => `href="/page/${encodeURIComponent(decodedPath)}/${p}" target="_top"`
     );
 
-    // Парсинг подстраниц (subpages)
     const subpageRegex = /<div class="subpage" id="([^"]+)">([\s\S]*?)<\/div>/g;
     const subpages = [];
     let spMatch;
@@ -124,14 +134,12 @@ body{display:flex;justify-content:center;margin:0;padding:10px 20px;background:#
         subpages.push({ id: '0000', html: raw });
     }
 
-    // Хлебные крошки
     const pathParts = decodedPath.split('/').filter(Boolean);
     const breadcrumb = pathParts.map((part, i) => ({
         name: part,
         path: pathParts.slice(0, i + 1).join('/')
     }));
 
-    // Список всех страниц в папке
     const files = await fs.readdir(fullPath);
     const pageNumbers = files
         .filter(f => f.endsWith('.html'))
@@ -143,14 +151,12 @@ body{display:flex;justify-content:center;margin:0;padding:10px 20px;background:#
     const prevPage = currentIndex > 0 ? pageNumbers[currentIndex - 1] : null;
     const nextPage = currentIndex < pageNumbers.length - 1 ? pageNumbers[currentIndex + 1] : null;
 
-    // Генерация списка с проверкой превью
     const pageList = await Promise.all(pageNumbers.map(async p => {
         const pngPath = path.join(fullPath, `${p}.png`);
         const hasThumb = await fs.access(pngPath).then(() => true).catch(() => false);
         return { page: p, hasThumb };
     }));
 
-    // Логотип раздела
     const logoSvgPath = path.join(fullPath, 'logo.svg');
     const logoPngPath = path.join(fullPath, 'logo.png');
     const logoExists = await fs.access(logoSvgPath).then(() => true).catch(() => false);
