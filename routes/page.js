@@ -7,17 +7,17 @@ const { isValidPath } = require('../lib/utils');
 const router = express.Router();
 
 /**
- * Универсальный парсер Fastext-кнопок с защитой от перескока между тегами.
- * Поддерживает:
- * 1. Цветной текст: class="...f1..."
- * 2. Цветной фон: class="...b1..."
- * 3. Строгую изоляцию внутри одного span (чтобы Красная не брала ссылку Зеленой)
+ * Универсальный парсер Fastext-кнопок.
+ * Корректно обрабатывает:
+ * 1. Ссылки внутри цветных span: <span class="f2 b0 nx"><a href="212.html">TEXT</a></span>
+ * 2. Кнопки без ссылок: <span class="f1 b0 nx">TEXT</span>
+ * 3. Цветной текст (f1-f4) и цветной фон (b1-b4)
+ * 4. Строгую изоляцию внутри одного тега span
  */
 function extractFastextLinks(html) {
     const links = { red: null, green: null, yellow: null, blue: null };
-
-    // Берём только конец файла, где обычно находятся кнопки
-    const bottom = html.slice(-600);
+    // Берем последние 800 символов (гарантированно захватывает нижнюю строку последней подстраницы)
+    const bottom = html.slice(-800);
 
     const targets = [
         { codes: ['f1', 'b1'], key: 'red' },
@@ -27,17 +27,15 @@ function extractFastextLinks(html) {
     ];
 
     for (const t of targets) {
-        // Если кнопку этого цвета уже нашли, пропускаем
         if (links[t.key]) continue;
 
         for (const code of t.codes) {
-            if (links[t.key]) break; // Если нашли в первой итерации (например f1), не ищем b1
+            if (links[t.key]) break; // Если уже нашли для этого цвета, не ищем дальше
 
-            // РЕГУЛЯРКА:
-            // 1. class="...code..." - находит блок с цветом
-            // 2. [^>]*> - завершает открывающий тег
-            // 3. (?:(?!<\/span>)[\s\S])*? - ищет контент, НО ОСТАНАВЛИВАЕТСЯ, если встречает </span>
-            // 4. href="(\d+).html" - находит ссылку внутри этого блока
+            // Регулярка ищет:
+            // 1. class="...f2..." или class="...b2..."
+            // 2. Закрывает открывающий тег span
+            // 3. Ищет href="..." ВНУТРИ этого span, ОСТАНАВЛИВАЯСЬ на </span>
             const regex = new RegExp(
                 `class="[^"]*${code}[^"]*"[^>]*>(?:(?!<\/span>)[\\s\\S])*?href="(\\d+)\\.html"`,
                 'i'
@@ -50,8 +48,8 @@ function extractFastextLinks(html) {
         }
     }
 
-    // Fallback: если синяя кнопка (Index/Next) не найдена по цвету,
-    // берём последнюю ссылку в зоне Fastext.
+    // Fallback для синей кнопки (Index/Next), если не нашли по цвету
+    // В телетексте последняя ссылка внизу обычно ведет на оглавление или следующую страницу
     if (!links.blue) {
         const allLinks = bottom.match(/href="(\d{3,4})\.html"/g);
         if (allLinks && allLinks.length > 0) {
@@ -93,7 +91,7 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
 
     const raw = await fs.readFile(htmlFile, 'utf-8');
 
-    // ✅ Извлекаем ссылки ДО того, как они будут изменены
+    // ✅ Извлекаем Fastext-ссылки ДО замены путей
     const fastextLinks = extractFastextLinks(raw);
 
     const headMatch = raw.match(/<head>([\s\S]*?)<\/head>/i);
