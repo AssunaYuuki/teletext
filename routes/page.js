@@ -6,47 +6,46 @@ const { isValidPath } = require('../lib/utils');
 
 const router = express.Router();
 
-/**
- * Автоматическое определение Fastext-ссылок.
- * 1. Ищет мета-комментарий <!-- FASTEXT: R=... G=... Y=... B=... -->
- * 2. Если нет — сканирует HTML на наличие ссылок вида href="101.html" и назначает их цветам.
- */
 function extractFastextLinks(html) {
-    // 1. Попытка найти ручной комментарий
-    const commentMatch = html.match(/<!--\s*FASTEXT:\s*R=(\d+)\s+G=(\d+)\s+Y=(\d+)\s+B=(\d+)\s*-->/i);
-    if (commentMatch) {
-        return {
-            red: commentMatch[1],
-            green: commentMatch[2],
-            yellow: commentMatch[3],
-            blue: commentMatch[4]
-        };
+    const links = { red: null, green: null, yellow: null, blue: null };
+
+    // Берем ПОСЛЕДНИЕ 500 символов (чтобы захватить все 4 кнопки)
+    const bottom = html.slice(-500);
+
+    // 1. Ищем цветные кнопки f1-f4, f6
+    const patterns = [
+        { code: '1', key: 'red' },
+        { code: '2', key: 'green' },
+        { code: '3', key: 'yellow' },
+        { code: '4', key: 'blue' },
+        { code: '6', key: 'blue' }
+    ];
+
+    for (const p of patterns) {
+        if (links[p.key]) continue;
+
+        // Ищем: class="...fX..."><a href="NUM.html"
+        const regex = new RegExp(`f${p.code}[^>]*>[^<]*<a[^>]*href="(\\d+)\\.html"`, 'i');
+        const match = bottom.match(regex);
+
+        if (match) {
+            links[p.key] = match[1];
+        }
     }
 
-    // 2. Автоматическое сканирование ссылок
-    // Ищем href="ЦИФРЫ.html" (поддерживает как кавычки, так и апострофы)
-    const linkRegex = /href\s*=\s*['"](\d{3,4})\.html['"]/gi;
-    let match;
-    const foundPages = [];
-
-    while ((match = linkRegex.exec(html)) !== null) {
-        const pageNum = parseInt(match[1], 10);
-        // Фильтруем только валидные страницы телетекста
-        if (pageNum >= 100 && pageNum <= 9999) {
-            if (!foundPages.includes(pageNum)) {
-                foundPages.push(pageNum);
+    // 2. Fallback для blue: любая последняя ссылка в bottom
+    if (!links.blue) {
+        const allLinks = bottom.match(/href="(\d{3,4})\.html"/g);
+        if (allLinks && allLinks.length > 0) {
+            const lastLink = allLinks[allLinks.length - 1];
+            const numMatch = lastLink.match(/href="(\d+)\.html"/);
+            if (numMatch) {
+                links.blue = numMatch[1];
             }
         }
-        // Берем только первые 4 уникальных ссылки
-        if (foundPages.length >= 4) break;
     }
 
-    return {
-        red: foundPages[0] || null,
-        green: foundPages[1] || null,
-        yellow: foundPages[2] || null,
-        blue: foundPages[3] || null
-    };
+    return links;
 }
 
 router.get('/page/*/:page', asyncHandler(async (req, res) => {
@@ -58,7 +57,6 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
         throw new AppError('Недопустимый путь', 400);
     }
 
-    // ✅ Увеличен лимит до 9999 (для файлов типа 2024.html)
     const page = parseInt(pageParam, 10);
     if (isNaN(page) || page < 100 || page > 9999) {
         throw new AppError('Некорректный номер страницы (100–9999)', 400);
@@ -79,24 +77,26 @@ router.get('/page/*/:page', asyncHandler(async (req, res) => {
 
     const raw = await fs.readFile(htmlFile, 'utf-8');
 
-    // ✅ Извлекаем Fastext-ссылки (автоматически или вручную)
     const fastextLinks = extractFastextLinks(raw);
 
     const headMatch = raw.match(/<head>([\s\S]*?)<\/head>/i);
     const headContent = headMatch ? headMatch[1] : '';
+
     const flFix = `<style>
 @keyframes teletext-blink{50%,100%{color:transparent}}
 .fl{text-decoration:none!important;animation:teletext-blink 1s step-end infinite}
 .cn{visibility:hidden}
-body{display:flex;justify-content:center;}
+body{display:flex;justify-content:center;margin:0;padding:10px 20px;background:#000;font-family:'Courier New',monospace;}
+.f0{color:#000}.f1{color:#f00}.f2{color:#0f0}.f3{color:#ff0}.f4{color:#00f}.f5{color:#f0f}.f6{color:#0ff}.f7{color:#fff}
+.b0{background:#000}.b1{background:#f00}.b2{background:#0f0}.b3{background:#ff0}.b4{background:#00f}.b5{background:#f0f}.b6{background:#0ff}.b7{background:#fff}
 </style>`;
 
     const encodedBasePath = decodedPath.split('/').map(s => encodeURIComponent(s)).join('/');
     const assetBase = `/teletext/${encodedBasePath}/`;
 
-    // Заменяем относительные href/src в head на абсолютные — base href в srcdoc ненадёжен
     const patchedHeadContent = headContent
         .replace(/(href|src)="(?!https?:|\/|#)([^"]+)"/g, `$1="${assetBase}$2"`);
+
     const patchedHead = `<head>${patchedHeadContent}${flFix}</head>`;
 
     const linkFixed = raw.replace(
@@ -112,6 +112,7 @@ body{display:flex;justify-content:center;}
         const html = `<html>${patchedHead}<body><div class="subpage" id="${id}">${inner}</div></body></html>`;
         subpages.push({ id, html });
     }
+
     if (subpages.length === 0) {
         subpages.push({ id: '0000', html: raw });
     }
@@ -160,8 +161,8 @@ body{display:flex;justify-content:center;}
         breadcrumb,
         hasLogo: logoExists || logoExistsPng,
         logoUrl,
-        fastextLinks: fastextLinks // ✅ Передаем данные о кнопках
+        fastextLinks
     });
 }));
 
-module.exports = router
+module.exports = router;
