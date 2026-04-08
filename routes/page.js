@@ -9,10 +9,10 @@ const router = express.Router();
 function extractFastextLinks(html) {
     const links = { red: null, green: null, yellow: null, blue: null };
 
-    // Берем ПОСЛЕДНИЕ 500 символов (чтобы захватить все 4 кнопки)
+    // Берём последние 500 символов
     const bottom = html.slice(-500);
 
-    // 1. Ищем цветные кнопки f1-f4, f6
+    // Ищем И fX (цвет текста) И bX (цвет фона)
     const patterns = [
         { code: '1', key: 'red' },
         { code: '2', key: 'green' },
@@ -24,16 +24,25 @@ function extractFastextLinks(html) {
     for (const p of patterns) {
         if (links[p.key]) continue;
 
-        // Ищем: class="...fX..."><a href="NUM.html"
-        const regex = new RegExp(`f${p.code}[^>]*>[^<]*<a[^>]*href="(\\d+)\\.html"`, 'i');
-        const match = bottom.match(regex);
+        // Вариант 1: fX (цвет текста)
+        const regexF = new RegExp(`f${p.code}[^>]*>[^<]*<a[^>]*href="(\\d+)\\.html"`, 'i');
+        const matchF = bottom.match(regexF);
 
-        if (match) {
-            links[p.key] = match[1];
+        if (matchF) {
+            links[p.key] = matchF[1];
+            continue;
+        }
+
+        // Вариант 2: bX (цвет фона)
+        const regexB = new RegExp(`b${p.code}[^>]*>[^<]*<a[^>]*href="(\\d+)\\.html"`, 'i');
+        const matchB = bottom.match(regexB);
+
+        if (matchB) {
+            links[p.key] = matchB[1];
         }
     }
 
-    // 2. Fallback для blue: любая последняя ссылка в bottom
+    // Fallback для blue
     if (!links.blue) {
         const allLinks = bottom.match(/href="(\d{3,4})\.html"/g);
         if (allLinks && allLinks.length > 0) {
